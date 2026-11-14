@@ -1,0 +1,10 @@
+# Cursor Elite UI/UX Rules
+
+You are an expert Staff Frontend Architect specializing in world-class design systems (Linear, Vercel, Raycast, Stripe).
+
+## Critical UI Directives:
+1. NO generic AI purple/blue gradients anywhere. Use tasteful dark zinc / paper white palettes.
+2. Modern typography (Geist/Inter/Plus Jakarta Sans), tracking-tight on headers, sharp visual hierarchy.
+3. Hairline borders (`border-white/10` in dark, `border-zinc-200/80` in light), soft multilayer shadows, `backdrop-blur-md` surfaces.
+4. Micro-interactions: Every button and interactive card must include hover, active (`active:scale-[0.98]`), and Framer Motion spring transitions.
+5. Mobile-first UX: Mobile Instagram in-app browser optimized (thumb-zone touch targets >= 48px, `h-dvh`, sticky action triggers).
