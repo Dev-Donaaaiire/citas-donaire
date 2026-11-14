@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "PEGA_AQUI_TU_SUPABASE_ACCESS_TOKEN"
+      }
+    },
+    "vercel": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@vercel/mcp-adapter"
+      ],
+      "env": {
+        "VERCEL_TOKEN": "PEGA_AQUI_TU_VERCEL_TOKEN"
+      }
+    }
+  }
+}
