@@ -47,12 +47,20 @@ export async function checkSystemUpdate(options?: {
   const currentVersion = CURRENT_SYSTEM_VERSION
   const checkedAt = new Date().toISOString()
 
-  // Determinar la URL del repositorio del usuario si está configurada
+  // Determinar la URL del repositorio del usuario (Vercel expone VERCEL_GIT_REPO_OWNER y VERCEL_GIT_REPO_SLUG automáticamente)
+  const vercelOwner = process.env.VERCEL_GIT_REPO_OWNER?.trim()
+  const vercelSlug = process.env.VERCEL_GIT_REPO_SLUG?.trim()
+  const detectedRepo =
+    vercelOwner && vercelSlug ? `${vercelOwner}/${vercelSlug}` : ''
+
   const userRepo = (
     options?.repoUrl ||
+    detectedRepo ||
     process.env.NEXT_PUBLIC_REPO_URL ||
     ''
-  ).replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '')
+  )
+    .replace(/^https?:\/\/github\.com\//, '')
+    .replace(/\/$/, '')
 
   let oneClickSyncUrl = `https://github.com/${UPSTREAM_GITHUB_REPO}`
   if (userRepo && !userRepo.includes('Dev-Donaaaiire')) {
