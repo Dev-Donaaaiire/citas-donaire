@@ -9,10 +9,27 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 const playfair = Playfair_Display({ variable: '--font-playfair', subsets: ['latin'] })
 const spaceGrotesk = Space_Grotesk({ variable: '--font-space', subsets: ['latin'] })
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '')
+function getValidMetadataBase(raw?: string): URL | undefined {
+  if (!raw) return undefined
+  let clean = raw.trim()
+  const mdMatch = clean.match(/\]\((https?:\/\/[^)]+)\)/i)
+  if (mdMatch) {
+    clean = mdMatch[1]
+  } else {
+    clean = clean.replace(/^[\[\(]+|[\]\)]+$/g, '')
+  }
+  if (!/^https?:\/\//i.test(clean)) {
+    clean = `https://${clean}`
+  }
+  try {
+    return new URL(clean)
+  } catch {
+    return undefined
+  }
+}
 
 export const metadata: Metadata = {
-  metadataBase: appUrl ? new URL(appUrl) : undefined,
+  metadataBase: getValidMetadataBase(process.env.NEXT_PUBLIC_APP_URL),
   title: 'Sistema de citas online por 14,99 € · Pago único | Krono / Donaire Citas',
   description:
     'Deja de perder clientes por teléfono. Sistema de citas con 3 diseños exclusivos, seguimiento de clientes que no vuelven y avisos al calendario. Sin cuotas mensuales.',
