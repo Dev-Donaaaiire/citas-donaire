@@ -6,7 +6,7 @@ Plataforma Next.js 16 (App Router, `proxy.ts`, Server Components, React 19, Tail
 
 ## Despliegue en 1 clic (Vercel)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDev-Donaaaiire%2Fcitas-donaire&env=NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY&envDescription=Introduce%20tus%20credenciales%20de%20Supabase%2C%20clave%20de%20administrador%2C%20Resend%20y%20tu%20LICENSE_KEY&project-name=agenda-citas&repository-name=agenda-citas)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDev-Donaaaiire%2Fcitas-donaire%2Ftree%2Fmain&env=NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY&envDescription=Introduce%20tus%20credenciales%20de%20Supabase%2C%20clave%20de%20administrador%2C%20Resend%20y%20tu%20LICENSE_KEY&project-name=agenda-citas&repository-name=agenda-citas)
 
 ---
 
