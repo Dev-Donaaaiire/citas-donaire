@@ -161,15 +161,29 @@ export async function deleteBlockedSlot(
 
 export async function sendRetentionReminder(
   clientId: string,
-  isDemo = false
-): Promise<{ success: boolean; simulated?: boolean; sandbox?: boolean }> {
+  isDemo = false,
+  options?: {
+    subject?: string
+    message?: string
+  }
+): Promise<{
+  success: boolean
+  simulated?: boolean
+  sandbox?: boolean
+  warning?: string
+  emailId?: string
+}> {
   const endpoint = isDemo
     ? '/api/demo/reminder'
     : '/api/notifications/reminder'
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clientId }),
+    body: JSON.stringify({
+      clientId,
+      subject: options?.subject,
+      message: options?.message,
+    }),
   })
   return parseJsonOrThrow(res)
 }

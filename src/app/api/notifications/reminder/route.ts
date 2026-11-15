@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => ({}))) as {
       clientId?: string
+      subject?: string
+      message?: string
     }
 
     const clientId = typeof body.clientId === 'string' ? body.clientId.trim() : ''
@@ -59,14 +61,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (settings?.modo_demo) {
-      return NextResponse.json({
-        success: true,
-        simulated: true,
-        reason: 'demo_mode',
-      })
-    }
-
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ||
       'http://localhost:3000'
@@ -78,6 +72,8 @@ export async function POST(request: NextRequest) {
       lastVisit: client.ultima_visita,
       timezone: settings?.timezone || 'Europe/Madrid',
       baseUrl,
+      customSubject: body.subject,
+      customMessage: body.message,
     })
 
     return NextResponse.json(result)
