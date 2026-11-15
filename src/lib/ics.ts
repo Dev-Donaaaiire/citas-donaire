@@ -15,6 +15,8 @@ export interface BookingCalendarInput {
   appointmentId: string
   tokenCancelacion: string
   businessName: string
+  businessAddress?: string | null
+  businessTimezone?: string | null
   serviceName: string
   servicePrice: number
   durationMinutes: number
@@ -134,7 +136,10 @@ export function generateBookingCalendarAssets(
   }).format(input.servicePrice)
 
   const title = `${input.serviceName} · ${input.businessName}`
-  const location = `${input.businessName} · Calle Serrano 45, Madrid`
+  const cleanAddress = input.businessAddress?.trim()
+  const location = cleanAddress
+    ? `${input.businessName} · ${cleanAddress}`
+    : input.businessName
 
   const descriptionLines = [
     `Negocio: ${input.businessName}`,

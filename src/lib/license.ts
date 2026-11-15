@@ -1,9 +1,12 @@
+import 'server-only'
+
 import crypto from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
+import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
 
 export const LICENSE_KEY_REGEX =
-  /^DONAIRE-[A-Z0-9]{4}-[A-Z0-9]{4}(-[A-Z0-9]{4})?$/
+  /^(DONAIRE|DONA)-[A-Z0-9]{4}-[A-Z0-9]{4}(-[A-Z0-9]{4})?$/
 
 export type LicensePlan = 'autoinstalable_15' | 'llave_en_mano_99'
 
@@ -22,7 +25,6 @@ export interface LicenseVerificationResult {
   status: LicenseVerificationStatus
   licenseKey: string | null
   plan: LicensePlan | null
-  compradorEmail: string | null
   dominioAutorizado: string | null
   checkedAt: string
   source: 'master_supabase' | 'remote_api' | 'demo_mode' | 'validation'
@@ -31,7 +33,7 @@ export interface LicenseVerificationResult {
 
 const LICENSE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
-function randomCodeBlock(length = 4): string {
+function generateSegment(length = 4): string {
   const bytes = crypto.randomBytes(length)
   let out = ''
   for (let i = 0; i < length; i++) {
@@ -41,86 +43,113 @@ function randomCodeBlock(length = 4): string {
 }
 
 /**
- * Genera una clave única criptográfica con formato DONAIRE-XXXX-XXXX-2027
+ * Genera criptográficamente una clave única compatible con public.licenses (DONAIRE-XXXX-XXXX-2027)
  */
 export function generateLicenseKey(): string {
-  return `DONAIRE-${randomCodeBlock(4)}-${randomCodeBlock(4)}-2027`
+  return `DONAIRE-${generateSegment()}-${generateSegment()}-2027`
 }
 
-function normalizeDomain(domain?: string | null): string | null {
+export function normalizeDomain(domain?: string | null): string | null {
   if (!domain) return null
-  return domain
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .split('/')[0]
-    .split(':')[0] || null
+  return (
+    domain
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .split('/')[0]
+      ?.split(':')[0] || null
+  )
 }
 
-function getMasterSupabase() {
+export function isLocalHostname(domain?: string | null): boolean {
+  const clean = normalizeDomain(domain)
+  if (!clean) return false
+  return clean === 'localhost' || clean === '127.0.0.1'
+}
+
+export function resolveTrustedDeploymentDomain(): string | null {
+  return normalizeDomain(
+    process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+      process.env.VERCEL_URL ||
+      null
+  )
+}
+
+function getMasterSupabase(): SupabaseClient<Database> | null {
   const url =
     process.env.MASTER_SUPABASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const key =
+  const serviceKey =
     process.env.MASTER_SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.MASTER_SUPABASE_ANON_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
 
-  if (!url || !key || !url.startsWith('http')) {
+  if (!url || !serviceKey || url.includes('tu-proyecto')) {
     return null
   }
 
-  return createClient<Database>(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+  return createClient<Database>(url, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   })
 }
 
-function getLocalSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
-
-  if (!url || !key || !url.startsWith('http')) {
-    return null
-  }
-
-  return createClient<Database>(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+export function maskLicenseKey(key: string | null): string | null {
+  if (!key) return null
+  const parts = key.split('-')
+  if (parts.length < 3) return 'DONAIRE-****'
+  return `${parts[0]}-****-${parts[parts.length - 1]}`
 }
 
 /**
  * Comprueba en servidor la validez de LICENSE_KEY contra el Supabase maestro
- * o contra el endpoint remoto configurado en LICENSE_VERIFY_API_URL.
+ * usando únicamente Service Role Key o contra LICENSE_VERIFY_API_URL.
  */
 export async function verifyLicenseServer(options?: {
-  licenseKey?: string | null
+  keyOverride?: string | null
   domain?: string | null
+  allowDomainBind?: boolean
   skipRemoteApi?: boolean
+  skipDemoFallback?: boolean
 }): Promise<LicenseVerificationResult> {
   const checkedAt = new Date().toISOString()
   const rawKey = (
-    options?.licenseKey ??
+    options?.keyOverride ??
     process.env.LICENSE_KEY ??
-    process.env.NEXT_PUBLIC_LICENSE_KEY ??
     ''
   )
     .trim()
     .toUpperCase()
-  const cleanDomain = normalizeDomain(options?.domain)
 
-  // 1. Validación opcional contra endpoint maestro si el comprador lo definió
+  const cleanDomain = normalizeDomain(options?.domain)
+  const isLocalHost = isLocalHostname(cleanDomain)
+
+  // 1. Si la instancia del comprador apunta a un API remoto del vendedor
   const remoteApiUrl = process.env.LICENSE_VERIFY_API_URL?.trim()
   if (remoteApiUrl && !options?.skipRemoteApi && rawKey) {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      const remoteSecret = process.env.LICENSE_VERIFY_SECRET?.trim()
+      if (remoteSecret) {
+        headers['x-license-verify-secret'] = remoteSecret
+      }
+
       const response = await fetch(remoteApiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseKey: rawKey, domain: cleanDomain }),
+        headers,
+        body: JSON.stringify({
+          licenseKey: rawKey,
+          domain: cleanDomain,
+          bindDomain: Boolean(options?.allowDomainBind),
+        }),
         cache: 'no-store',
       })
+
       if (response.ok) {
         const json = (await response.json()) as Partial<LicenseVerificationResult>
         if (typeof json.valid === 'boolean') {
@@ -130,7 +159,6 @@ export async function verifyLicenseServer(options?: {
             status: json.status || (json.valid ? 'active' : 'invalid'),
             licenseKey: rawKey,
             plan: json.plan ?? null,
-            compradorEmail: json.compradorEmail ?? null,
             dominioAutorizado: json.dominioAutorizado ?? null,
             checkedAt,
             source: 'remote_api',
@@ -147,30 +175,33 @@ export async function verifyLicenseServer(options?: {
     }
   }
 
-  // 2. Si falta LICENSE_KEY, comprobar si el entorno está en modo demo
+  // 2. Si falta LICENSE_KEY, comprobar si el entorno está explícitamente en modo_demo
   if (!rawKey) {
-    const localClient = getLocalSupabase()
-    if (localClient) {
-      const { data: settings } = await localClient
-        .from('business_settings')
-        .select('modo_demo')
-        .limit(1)
-        .maybeSingle()
+    if (!options?.skipDemoFallback && hasSupabaseAdminConfig()) {
+      try {
+        const adminDb = getSupabaseAdmin()
+        const { data: settingsRow } = await adminDb
+          .from('business_settings')
+          .select('modo_demo')
+          .limit(1)
+          .maybeSingle()
 
-      if (settings?.modo_demo) {
-        return {
-          valid: true,
-          unlimited: true,
-          status: 'demo',
-          licenseKey: 'DONAIRE-DEMO-2027-2027',
-          plan: 'llave_en_mano_99',
-          compradorEmail: 'demo@donaire.dev',
-          dominioAutorizado: cleanDomain || 'localhost',
-          checkedAt,
-          source: 'demo_mode',
-          message:
-            'Modo Demo activo. Añade tu variable LICENSE_KEY para activar producción sin marcas de demo.',
+        if (settingsRow?.modo_demo) {
+          return {
+            valid: true,
+            unlimited: false,
+            status: 'demo',
+            licenseKey: null,
+            plan: null,
+            dominioAutorizado: null,
+            checkedAt,
+            source: 'demo_mode',
+            message:
+              'Modo Demo activo. Añade tu variable LICENSE_KEY para activar producción sin límites.',
+          }
         }
+      } catch {
+        // Ignorar error de consulta
       }
     }
 
@@ -180,7 +211,6 @@ export async function verifyLicenseServer(options?: {
       status: 'missing',
       licenseKey: null,
       plan: null,
-      compradorEmail: null,
       dominioAutorizado: null,
       checkedAt,
       source: 'validation',
@@ -189,7 +219,6 @@ export async function verifyLicenseServer(options?: {
     }
   }
 
-  // 3. Validar formato estricto DONAIRE-XXXX-XXXX(-2027)
   if (!LICENSE_KEY_REGEX.test(rawKey)) {
     return {
       valid: false,
@@ -197,16 +226,14 @@ export async function verifyLicenseServer(options?: {
       status: 'invalid',
       licenseKey: rawKey,
       plan: null,
-      compradorEmail: null,
       dominioAutorizado: null,
       checkedAt,
       source: 'validation',
       message:
-        'Formato de licencia incorrecto. Debe seguir el patrón DONAIRE-XXXX-XXXX-2027.',
+        'Formato de licencia inválido. Debe ser DONAIRE-XXXX-XXXX-2027 o DONAIRE-XXXX-XXXX.',
     }
   }
 
-  // 4. Consultar tabla licenses en Supabase maestro
   const masterClient = getMasterSupabase()
   if (!masterClient) {
     return {
@@ -215,12 +242,11 @@ export async function verifyLicenseServer(options?: {
       status: 'unconfigured',
       licenseKey: rawKey,
       plan: null,
-      compradorEmail: null,
       dominioAutorizado: null,
       checkedAt,
-      source: 'master_supabase',
+      source: 'validation',
       message:
-        'Faltan credenciales de Supabase para verificar la licencia en el servidor.',
+        'Falta configurar SUPABASE_SERVICE_ROLE_KEY o MASTER_SUPABASE_SERVICE_ROLE_KEY para validar licencias.',
     }
   }
 
@@ -237,11 +263,10 @@ export async function verifyLicenseServer(options?: {
       status: 'unconfigured',
       licenseKey: rawKey,
       plan: null,
-      compradorEmail: null,
       dominioAutorizado: null,
       checkedAt,
       source: 'master_supabase',
-      message: `No se pudo consultar la tabla licenses: ${error.message}`,
+      message: `No se pudo verificar la licencia en base de datos (${error.message}).`,
     }
   }
 
@@ -252,7 +277,6 @@ export async function verifyLicenseServer(options?: {
       status: 'invalid',
       licenseKey: rawKey,
       plan: null,
-      compradorEmail: null,
       dominioAutorizado: null,
       checkedAt,
       source: 'master_supabase',
@@ -267,42 +291,36 @@ export async function verifyLicenseServer(options?: {
       status: 'inactive',
       licenseKey: licenseRow.license_key,
       plan: licenseRow.plan,
-      compradorEmail: licenseRow.comprador_email,
       dominioAutorizado: licenseRow.dominio_autorizado,
       checkedAt,
       source: 'master_supabase',
-      message: 'Esta licencia está desactivada o fue reembolsada.',
+      message: 'Esta licencia está desactivada o revocada.',
     }
   }
 
-  // 5. Vinculación automática de dominio en el primer despliegue en producción
-  const isDemoKey = rawKey.startsWith('DONAIRE-DEMO')
-  const isLocalHost =
-    !cleanDomain || cleanDomain === 'localhost' || cleanDomain === '127.0.0.1'
+  const isDemoKey =
+    licenseRow.license_key.startsWith('DONA-DEMO-') ||
+    licenseRow.license_key.startsWith('DONAIRE-DEMO')
+  let authorizedDomain = normalizeDomain(licenseRow.dominio_autorizado)
 
-  let authorizedDomain = licenseRow.dominio_autorizado
-
-  if (!isDemoKey && !isLocalHost) {
+  if (!isDemoKey && cleanDomain && !isLocalHost) {
     if (!authorizedDomain || authorizedDomain === 'localhost') {
-      const { error: updateErr } = await masterClient
-        .from('licenses')
-        .update({ dominio_autorizado: cleanDomain })
-        .eq('id', licenseRow.id)
-      if (!updateErr) {
-        authorizedDomain = cleanDomain
+      if (options?.allowDomainBind) {
+        const { error: updateErr } = await masterClient
+          .from('licenses')
+          .update({ dominio_autorizado: cleanDomain })
+          .eq('id', licenseRow.id)
+        if (!updateErr) {
+          authorizedDomain = cleanDomain
+        }
       }
-    } else if (
-      authorizedDomain !== cleanDomain &&
-      !cleanDomain.endsWith('.vercel.app') &&
-      !authorizedDomain.endsWith('.vercel.app')
-    ) {
+    } else if (authorizedDomain !== cleanDomain) {
       return {
         valid: false,
         unlimited: false,
         status: 'domain_mismatch',
         licenseKey: licenseRow.license_key,
         plan: licenseRow.plan,
-        compradorEmail: licenseRow.comprador_email,
         dominioAutorizado: authorizedDomain,
         checkedAt,
         source: 'master_supabase',
@@ -317,7 +335,6 @@ export async function verifyLicenseServer(options?: {
     status: isDemoKey ? 'demo' : 'active',
     licenseKey: licenseRow.license_key,
     plan: licenseRow.plan,
-    compradorEmail: licenseRow.comprador_email,
     dominioAutorizado: authorizedDomain,
     checkedAt,
     source: 'master_supabase',
@@ -327,8 +344,55 @@ export async function verifyLicenseServer(options?: {
   }
 }
 
+export async function checkProductionLicenseGate(
+  modoDemo: boolean,
+  options?: { isRealBookingInProduction?: boolean }
+): Promise<{
+  blocked: boolean
+  license: LicenseVerificationResult
+}> {
+  const trustedDomain = resolveTrustedDeploymentDomain()
+  const isLocalHost = isLocalHostname(trustedDomain)
+  const isShowcaseDemo =
+    trustedDomain === 'citas.donaire.dev' ||
+    trustedDomain === 'citas-donaire.vercel.app'
+
+  const isProd = process.env.NODE_ENV === 'production'
+  const enforceLicense = Boolean(
+    options?.isRealBookingInProduction &&
+      isProd &&
+      !isLocalHost &&
+      !isShowcaseDemo
+  )
+
+  const license = await verifyLicenseServer({
+    domain: trustedDomain,
+    allowDomainBind: Boolean(trustedDomain),
+    skipDemoFallback: enforceLicense,
+  })
+
+  if (modoDemo && !enforceLicense) {
+    return { blocked: false, license }
+  }
+
+  if (enforceLicense) {
+    const isCommercialValid = license.valid && license.status === 'active'
+    return { blocked: !isCommercialValid, license }
+  }
+
+  const blockedStatuses: LicenseVerificationStatus[] = [
+    'invalid',
+    'inactive',
+    'domain_mismatch',
+    'missing',
+  ]
+
+  const blocked = !license.valid && blockedStatuses.includes(license.status)
+  return { blocked, license }
+}
+
 /**
- * Crea o recupera (idempotente por id de pago de PayPal o Stripe) una licencia en Supabase maestro
+ * Crea o recupera (idempotente por id de pago de PayPal) una licencia en Supabase maestro
  */
 export async function issueOrGetLicenseForPaymentSession(params: {
   compradorEmail: string
@@ -338,11 +402,10 @@ export async function issueOrGetLicenseForPaymentSession(params: {
   const masterClient = getMasterSupabase()
   if (!masterClient) {
     throw new Error(
-      'Faltan variables de entorno de Supabase para emitir licencias.'
+      'Faltan credenciales Service Role de Supabase para emitir licencias.'
     )
   }
 
-  // Idempotencia: comprobar si esta sesión de pago ya generó una clave
   if (params.paymentSessionId) {
     const { data: existing } = await masterClient
       .from('licenses')
@@ -358,7 +421,6 @@ export async function issueOrGetLicenseForPaymentSession(params: {
     }
   }
 
-  // Reintentar hasta 5 veces ante improbable colisión de randomBytes
   let lastError: string | null = null
   for (let attempt = 0; attempt < 5; attempt++) {
     const licenseKey = generateLicenseKey()
@@ -367,11 +429,11 @@ export async function issueOrGetLicenseForPaymentSession(params: {
       .insert({
         license_key: licenseKey,
         comprador_email: params.compradorEmail.trim().toLowerCase(),
-        stripe_session_id: params.paymentSessionId,
         plan: params.plan,
         activa: true,
+        stripe_session_id: params.paymentSessionId || null,
       })
-      .select('*')
+      .select()
       .single()
 
     if (!error && data) {
@@ -380,26 +442,8 @@ export async function issueOrGetLicenseForPaymentSession(params: {
         alreadyExisted: false,
       }
     }
-
-    lastError = error?.message || 'Error desconocido al insertar licencia'
+    lastError = error?.message || 'Error al insertar licencia'
   }
 
-  throw new Error(
-    `No se pudo registrar la licencia en Supabase tras varios intentos: ${lastError}`
-  )
-}
-
-/**
- * Alias de compatibilidad para sesiones de pago
- */
-export async function issueOrGetLicenseForStripeSession(params: {
-  compradorEmail: string
-  stripeSessionId: string
-  plan: LicensePlan
-}) {
-  return issueOrGetLicenseForPaymentSession({
-    compradorEmail: params.compradorEmail,
-    paymentSessionId: params.stripeSessionId,
-    plan: params.plan,
-  })
+  throw new Error(lastError || 'No se pudo generar la clave de licencia.')
 }

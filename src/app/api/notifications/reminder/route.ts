@@ -1,42 +1,96 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAdminSession } from '@/lib/admin-auth'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { sendClientReminderEmail } from '@/lib/email-service'
 
-interface ReminderNotificationBody {
-  clientName?: string
-  clientEmail?: string
-  businessName?: string
-  lastVisit?: string | null
-}
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as ReminderNotificationBody
+    const auth = await requireAdminSession()
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
 
-    if (!body.clientName || !body.clientEmail) {
+    const body = (await request.json().catch(() => ({}))) as {
+      clientId?: string
+    }
+
+    const clientId = typeof body.clientId === 'string' ? body.clientId.trim() : ''
+    if (!UUID_REGEX.test(clientId)) {
       return NextResponse.json(
-        { error: 'Faltan el nombre o email del cliente.' },
+        { error: 'Se requiere un clientId válido para enviar el recordatorio.' },
         { status: 400 }
       )
     }
 
-    const origin =
-      process.env.NEXT_PUBLIC_APP_URL?.trim() || new URL(request.url).origin
+    const db = getSupabaseAdmin()
+
+    const [{ data: client, error: clientError }, { data: settings }] =
+      await Promise.all([
+        db
+          .from('clients')
+          .select('id, nombre, email, ultima_visita, bloqueado_no_show')
+          .eq('id', clientId)
+          .maybeSingle(),
+        db
+          .from('business_settings')
+          .select('nombre_negocio, timezone, modo_demo')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ])
+
+    if (clientError || !client) {
+      return NextResponse.json(
+        { error: 'Cliente no encontrado en la base de datos.' },
+        { status: 404 }
+      )
+    }
+
+    if (client.bloqueado_no_show) {
+      return NextResponse.json(
+        {
+          error:
+            'Este cliente está bloqueado por no-shows previos y no puede recibir campañas automáticas.',
+        },
+        { status: 400 }
+      )
+    }
+
+    if (settings?.modo_demo) {
+      return NextResponse.json({
+        success: true,
+        simulated: true,
+        reason: 'demo_mode',
+      })
+    }
+
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ||
+      'http://localhost:3000'
 
     const result = await sendClientReminderEmail({
-      clientName: body.clientName,
-      clientEmail: body.clientEmail,
-      businessName: body.businessName || 'Krono / Donaire Luxury Hair & Styling',
-      lastVisit: body.lastVisit,
-      baseUrl: origin,
+      clientName: client.nombre,
+      clientEmail: client.email,
+      businessName: settings?.nombre_negocio || 'Krono Studio',
+      lastVisit: client.ultima_visita,
+      timezone: settings?.timezone || 'Europe/Madrid',
+      baseUrl,
     })
 
     return NextResponse.json(result)
-  } catch (err: unknown) {
-    console.error('Error en /api/notifications/reminder:', err)
-    const message =
-      err instanceof Error
-        ? err.message
-        : 'Error interno al enviar el recordatorio por email.'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch (err) {
+    console.error('[api/notifications/reminder] Error:', err)
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : 'No se pudo enviar el recordatorio al cliente.',
+      },
+      { status: 500 }
+    )
   }
 }

@@ -1,23 +1,33 @@
 'use client'
 
 import React, { useState } from 'react'
-import { User, Mail, Phone, FileText, AlertTriangle, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react'
+import {
+  User,
+  Mail,
+  Phone,
+  FileText,
+  ArrowLeft,
+  ShieldCheck,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react'
 import type { Service, TimeSlot } from '@/types/booking'
 import { formatCurrency, formatDateFull } from '@/lib/format'
-import { isEmailBlacklisted } from '@/lib/booking-service'
-import { cn } from '@/lib/utils'
 
 interface BookingFormProps {
   service: Service
   selectedDate: Date
   selectedSlot: TimeSlot
-  onSubmit: (formData: {
-    clientName: string
-    clientEmail: string
-    clientPhone?: string
-    notes?: string
+  timezone?: string | null
+  onSubmit: (data: {
+    nombre: string
+    email: string
+    telefono: string
+    notas: string
+    website: string
   }) => Promise<void>
   isSubmitting: boolean
+  submitError?: string | null
   onBack: () => void
 }
 
@@ -25,190 +35,198 @@ export function BookingForm({
   service,
   selectedDate,
   selectedSlot,
+  timezone,
   onSubmit,
   isSubmitting,
+  submitError,
   onBack,
 }: BookingFormProps) {
-  const [name, setName] = useState('')
+  const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [notes, setNotes] = useState('')
-  const [isBlacklisted, setIsBlacklisted] = useState(false)
-  const [validationError, setValidationError] = useState<string | null>(null)
-
-  const handleEmailBlur = async () => {
-    if (email && email.includes('@')) {
-      try {
-        const blocked = await isEmailBlacklisted(email)
-        setIsBlacklisted(blocked)
-      } catch {
-        // Ignorar fallo puntual
-      }
-    }
-  }
+  const [telefono, setTelefono] = useState('')
+  const [notas, setNotas] = useState('')
+  const [website, setWebsite] = useState('')
+  const [localError, setLocalError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setValidationError(null)
+    setLocalError(null)
 
-    if (!name.trim()) {
-      setValidationError('Por favor introduce tu nombre completo.')
+    const cleanName = nombre.trim()
+    const cleanEmail = email.trim().toLowerCase()
+    const cleanPhone = telefono.trim()
+
+    if (cleanName.length < 2) {
+      setLocalError('Por favor, introduce tu nombre completo.')
       return
     }
 
-    if (!email.trim() || !email.includes('@')) {
-      setValidationError('Por favor introduce un correo electrónico válido.')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setLocalError('Introduce un correo electrónico válido para enviarte la confirmación.')
       return
     }
 
-    if (isBlacklisted) {
-      setValidationError(
-        'Este correo tiene restringidas las reservas automáticas. Por favor contacta al salón.'
-      )
+    if (cleanPhone.length < 6) {
+      setLocalError('Introduce un número de teléfono válido para avisos de tu cita.')
       return
     }
 
     await onSubmit({
-      clientName: name.trim(),
-      clientEmail: email.trim(),
-      clientPhone: phone.trim() || undefined,
-      notes: notes.trim() || undefined,
+      nombre: cleanName,
+      email: cleanEmail,
+      telefono: cleanPhone,
+      notas: notas.trim(),
+      website,
     })
   }
 
+  const displayError = submitError || localError
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Resumen del servicio y fecha seleccionada */}
-      <div className="p-4 rounded-2xl bg-zinc-900/60 border border-white/10 backdrop-blur-md flex items-center justify-between gap-4">
+    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      {/* Resumen compacto superior */}
+      <div className="p-4 rounded-2xl bg-zinc-900/60 border border-white/10 backdrop-blur-md flex items-center justify-between gap-3">
         <div>
-          <span className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider block mb-0.5">
-            Cita seleccionada
-          </span>
-          <h4 className="font-semibold text-zinc-100 text-sm sm:text-base">
-            {service.nombre}
-          </h4>
-          <p className="text-xs text-emerald-400 font-mono mt-0.5">
-            {formatDateFull(selectedDate)} a las {selectedSlot.time} h
+          <p className="text-xs text-zinc-400 font-mono uppercase tracking-wider">
+            {service.nombre} · {service.duracion_minutos} min
+          </p>
+          <p className="text-sm font-medium text-zinc-100 mt-0.5 capitalize">
+            {formatDateFull(selectedDate, timezone)} a las {selectedSlot.time} h
           </p>
         </div>
-
-        <div className="text-right shrink-0">
-          <span className="font-mono text-lg font-bold text-white">
+        <div className="text-right">
+          <span className="text-base font-bold font-mono text-zinc-100">
             {formatCurrency(Number(service.precio))}
-          </span>
-          <span className="block text-[11px] font-mono text-zinc-400">
-            {service.duracion_minutos} min
           </span>
         </div>
       </div>
 
-      {/* Alerta de validación o blacklist */}
-      {isBlacklisted && (
-        <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/40 flex items-start gap-3 text-red-300">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-red-400 mt-0.5" />
-          <div className="text-xs leading-relaxed">
-            <strong className="block font-semibold text-red-200">
-              Email con reserva restringida
-            </strong>
-            Este correo figura en la lista de no-show por inasistencias pasadas sin cancelación previa. Contacta al salón al +34 612 345 678 para validar tu hueco.
-          </div>
-        </div>
-      )}
-
-      {validationError && (
-        <div className="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-xs text-red-300 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
-          <span>{validationError}</span>
+      {/* Mensaje de error de validación o de servidor */}
+      {displayError && (
+        <div
+          role="alert"
+          className="p-4 rounded-xl ui-badge-danger border text-xs sm:text-sm font-medium flex items-start gap-2.5"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">{displayError}</p>
         </div>
       )}
 
       {/* Campos del formulario */}
       <div className="space-y-4">
-        {/* Nombre */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+          <label
+            htmlFor="booking-name"
+            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
+          >
             <User className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Nombre completo</span>
-            <span className="text-emerald-400">*</span>
+            <span>Nombre y apellidos *</span>
           </label>
           <input
+            id="booking-name"
             type="text"
             required
+            autoComplete="name"
             placeholder="Ej. Carlos Mendoza"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all text-sm"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
           />
         </div>
 
-        {/* Email */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+          <label
+            htmlFor="booking-email"
+            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
+          >
             <Mail className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Correo electrónico</span>
-            <span className="text-emerald-400">*</span>
+            <span>Correo electrónico *</span>
           </label>
           <input
+            id="booking-email"
             type="email"
             required
-            placeholder="Ej. carlos@example.com"
+            autoComplete="email"
+            placeholder="ejemplo@correo.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            onBlur={handleEmailBlur}
-            className={cn(
-              'w-full h-12 px-4 rounded-xl bg-zinc-900/60 border text-white placeholder:text-zinc-600 focus:outline-none transition-all text-sm',
-              isBlacklisted
-                ? 'border-red-500/60 focus:ring-1 focus:ring-red-500'
-                : 'border-white/10 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50'
-            )}
+            className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
           />
-          <p className="text-[11px] text-zinc-500">
-            Te enviaremos los detalles y el enlace directo de cancelación si te surge un imprevisto.
+          <p className="text-xs text-zinc-400 pl-1">
+            Enviaremos aquí tu entrada al calendario y el enlace para cambiar o
+            cancelar en 1 clic.
           </p>
         </div>
 
-        {/* Teléfono opcional */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Teléfono móvil</span>
-              <span className="text-zinc-500 text-[11px]">(Opcional)</span>
-            </span>
-            <span className="text-[11px] text-emerald-400/80 font-mono">
-              Recordatorio por WhatsApp
-            </span>
+          <label
+            htmlFor="booking-phone"
+            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
+          >
+            <Phone className="w-3.5 h-3.5 text-zinc-400" />
+            <span>Teléfono móvil *</span>
           </label>
           <input
+            id="booking-phone"
             type="tel"
-            placeholder="Ej. +34 612 345 678"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all text-sm"
+            required
+            autoComplete="tel"
+            placeholder="Ej. +34 600 000 000"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
           />
         </div>
 
-        {/* Notas adicionales */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+          <label
+            htmlFor="booking-notes"
+            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
+          >
             <FileText className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Petición o nota para el estilista</span>
-            <span className="text-zinc-500 text-[11px]">(Opcional)</span>
+            <span>Notas adicionales (opcional)</span>
           </label>
           <textarea
+            id="booking-notes"
             rows={2}
-            placeholder="Ej. Degradado medio, piel sensible en el cuello, etc."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full p-3 rounded-xl bg-zinc-900/60 border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/50 transition-all text-sm resize-none"
+            placeholder="¿Algo que debamos saber antes de tu cita?"
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors resize-none"
           />
         </div>
       </div>
 
-      {/* Garantía de privacidad sin llamadas */}
-      <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-900/30 border border-white/5 text-zinc-400 text-xs">
-        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-        <span>Reserva 100% confirmada al instante. Sin llamadas ni creación de contraseñas.</span>
+      {/* Honeypot anti-bots: invisible para humanos y lectores de pantalla */}
+      <div
+        aria-hidden="true"
+        className="sr-only absolute -left-[9999px] h-0 w-0 overflow-hidden"
+      >
+        <label htmlFor="booking-website">No rellenes este campo</label>
+        <input
+          id="booking-website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+        />
+      </div>
+
+      {/* Garantía de privacidad */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-zinc-900/40 border border-white/10 text-zinc-300 text-xs">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>
+            Reserva 100% confirmada al instante. Sin llamadas ni creación de
+            contraseñas.
+          </span>
+        </div>
+        <p className="text-xs text-zinc-400 px-1 leading-relaxed">
+          Podrás cambiar o cancelar tu cita gratis en 1 clic desde tu email de
+          confirmación.
+        </p>
       </div>
 
       {/* Botones de acción */}
@@ -217,30 +235,25 @@ export function BookingForm({
           type="button"
           onClick={onBack}
           disabled={isSubmitting}
-          className="h-12 px-5 rounded-xl border border-white/10 text-zinc-300 hover:text-white hover:bg-zinc-800 text-sm font-medium transition-colors"
+          aria-label="Volver al paso anterior"
+          className="min-h-12 min-w-12 px-4 rounded-xl border border-white/10 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800 hover:text-white transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 text-sm font-medium shrink-0"
         >
-          Atrás
+          <ArrowLeft className="w-4 h-4" />
+          <span className="hidden sm:inline">Atrás</span>
         </button>
 
         <button
           type="submit"
-          disabled={isSubmitting || isBlacklisted}
-          className={cn(
-            'flex-1 h-12 px-6 rounded-xl font-semibold text-sm transition-all duration-200 select-none cursor-pointer flex items-center justify-center gap-2',
-            'bg-emerald-500 text-zinc-950 hover:bg-emerald-400 active:scale-[0.98]',
-            'shadow-[0_0_20px_rgb(var(--glow-rgb)/0.3)] disabled:opacity-50 disabled:pointer-events-none'
-          )}
+          disabled={isSubmitting}
+          className="flex-1 min-h-12 px-6 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 bg-emerald-500 text-zinc-950 hover:bg-emerald-400 active:scale-[0.98] shadow-[0_0_20px_rgb(var(--glow-rgb)/0.25)] disabled:opacity-50"
         >
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Confirmando tu reserva...</span>
+              <span>Confirmando reserva...</span>
             </>
           ) : (
-            <>
-              <span>Confirmar Cita Ahora</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
+            <span>Confirmar Reserva</span>
           )}
         </button>
       </div>

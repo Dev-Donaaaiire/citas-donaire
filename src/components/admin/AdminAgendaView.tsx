@@ -1,434 +1,551 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import React, { useMemo, useState } from 'react'
 import {
   Clock,
-  User,
-  CheckCircle,
+  CheckCircle2,
   XCircle,
-  Ban,
-  Plus,
+  Lock,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
-  MessageCircle,
+  Phone,
+  Calendar as CalendarIcon,
+  Plus,
+  Loader2,
+  UserX,
 } from 'lucide-react'
 import type { Appointment, BlockedSlot } from '@/types/booking'
 import { formatCurrency, formatDateFull, formatTime, formatDateKey } from '@/lib/format'
 import {
-  updateAppointmentStatus,
-  deleteBlockedSlot,
-  createBlockedSlot,
-} from '@/lib/booking-service'
-import { AdminBlockSlotModal } from './AdminBlockSlotModal'
+  addDaysToIsoDate,
+  getTodayIsoInTimeZone,
+  sanitizeTimeZone,
+  zonedDateTimeToUtc,
+} from '@/lib/timezone'
+import { updateAppointmentStatus, deleteBlockedSlot } from '@/lib/booking-service'
 import { cn } from '@/lib/utils'
+import { AdminBlockSlotModal } from '@/components/admin/AdminBlockSlotModal'
+import { useFeedback } from '@/components/ui/FeedbackProvider'
 
 interface AdminAgendaViewProps {
   appointments: Appointment[]
   blockedSlots: BlockedSlot[]
-  onRefresh: () => void
+  timezone?: string | null
+  isDemo?: boolean
+  isSandboxFallback?: boolean
+  onRefresh: (range?: { fromIso: string; toIso: string }) => void
+  onSandboxStatusUpdate?: (
+    appointmentId: string,
+    newStatus: 'confirmada' | 'cancelada' | 'completada' | 'no_show'
+  ) => void
+  onSandboxBlockAdd?: (slot: BlockedSlot) => void
+  onSandboxBlockDelete?: (id: string) => void
 }
 
 export function AdminAgendaView({
   appointments,
   blockedSlots,
+  timezone = 'Europe/Madrid',
+  isDemo = false,
+  isSandboxFallback = false,
   onRefresh,
+  onSandboxStatusUpdate,
+  onSandboxBlockAdd,
+  onSandboxBlockDelete,
 }: AdminAgendaViewProps) {
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily')
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false)
-  const [processingId, setProcessingId] = useState<string | null>(null)
+  const { notify, confirmAction } = useFeedback()
+  const tz = sanitizeTimeZone(timezone)
+  const todayKey = getTodayIsoInTimeZone(tz)
 
-  const selectedDateKey = formatDateKey(selectedDate)
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(todayKey)
+  const [viewMode, setViewMode] = useState<'day' | 'upcoming'>('day')
+  const [showBlockModal, setShowBlockModal] = useState(false)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
-  // Desplazamiento de fechas
-  const handlePrevDay = () => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() - (viewMode === 'daily' ? 1 : 7))
-    setSelectedDate(d)
-  }
+  const dateTabs = useMemo(() => {
+    const labelFmt = new Intl.DateTimeFormat('es-ES', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: tz,
+    })
 
-  const handleNextDay = () => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + (viewMode === 'daily' ? 1 : 7))
-    setSelectedDate(d)
-  }
+    const list: { key: string; label: string }[] = []
+    for (let i = 0; i < 7; i += 1) {
+      const iso = addDaysToIsoDate(todayKey, i)
+      const noon = zonedDateTimeToUtc(iso, '12:00', tz)
+      const label =
+        i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : labelFmt.format(noon)
+      list.push({ key: iso, label })
+    }
+    return list
+  }, [todayKey, tz])
 
-  const handleToday = () => {
-    setSelectedDate(new Date())
-  }
-
-  // Filtrar citas según la vista diaria o semanal
   const filteredAppointments = useMemo(() => {
-    if (viewMode === 'daily') {
-      return appointments.filter((appt) => {
-        const apptDateKey = formatDateKey(new Date(appt.fecha_hora_inicio))
-        return apptDateKey === selectedDateKey
-      })
-    } else {
-      // Semana completa
-      const dayOfWeek = selectedDate.getDay()
-      const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-      const weekStart = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        selectedDate.getDate() - daysSinceMonday,
-        0,
-        0,
-        0
+    const now = new Date()
+    const list = appointments.filter((appt) => {
+      if (viewMode === 'day') {
+        return formatDateKey(appt.fecha_hora_inicio, tz) === selectedDateKey
+      }
+      return (
+        new Date(appt.fecha_hora_inicio) >= now ||
+        formatDateKey(appt.fecha_hora_inicio, tz) === todayKey
       )
-      const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+    })
 
-      return appointments.filter((appt) => {
-        const d = new Date(appt.fecha_hora_inicio)
-        return d >= weekStart && d < weekEnd
+    return list.sort(
+      (a, b) =>
+        new Date(a.fecha_hora_inicio).getTime() -
+        new Date(b.fecha_hora_inicio).getTime()
+    )
+  }, [appointments, viewMode, selectedDateKey, todayKey, tz])
+
+  const filteredBlocks = useMemo(() => {
+    return blockedSlots
+      .filter((b) => {
+        if (viewMode === 'day') {
+          const bStart = formatDateKey(b.fecha_inicio, tz)
+          const bEnd = formatDateKey(b.fecha_fin, tz)
+          return bStart <= selectedDateKey && bEnd >= selectedDateKey
+        }
+        return new Date(b.fecha_fin) >= new Date()
       })
-    }
-  }, [appointments, viewMode, selectedDate, selectedDateKey])
+      .sort(
+        (a, b) =>
+          new Date(a.fecha_inicio).getTime() -
+          new Date(b.fecha_inicio).getTime()
+      )
+  }, [blockedSlots, viewMode, selectedDateKey, tz])
 
-  // Manejar cambio de estado en 1 clic
-  const handleStatusChange = async (
+  const handleJumpDate = (newIsoDate: string) => {
+    if (!newIsoDate) return
+    setSelectedDateKey(newIsoDate)
+    setViewMode('day')
+    // Cargar ventana alrededor de la fecha elegida (paginación temporal en servidor)
+    const fromIso = zonedDateTimeToUtc(
+      addDaysToIsoDate(newIsoDate, -7),
+      '00:00',
+      tz
+    ).toISOString()
+    const toIso = zonedDateTimeToUtc(
+      addDaysToIsoDate(newIsoDate, 31),
+      '23:59',
+      tz
+    ).toISOString()
+    onRefresh({ fromIso, toIso })
+  }
+
+  const handleUpdateStatus = async (
     apptId: string,
-    status: 'completada' | 'cancelada' | 'confirmada'
+    status: 'completada' | 'cancelada' | 'no_show'
   ) => {
-    setProcessingId(apptId)
+    if (status === 'cancelada' || status === 'no_show') {
+      const ok = await confirmAction({
+        title:
+          status === 'no_show'
+            ? '¿Marcar cita como No-Show?'
+            : '¿Cancelar esta cita?',
+        description:
+          status === 'no_show'
+            ? 'Se incrementará el contador de ausencias del cliente (si acumula 2, se bloqueará automáticamente).'
+            : 'La cita pasará a estado cancelada y liberará el hueco en el calendario público.',
+        confirmLabel:
+          status === 'no_show' ? 'Registrar No-Show' : 'Sí, cancelar cita',
+        cancelLabel: 'Volver',
+        tone: 'danger',
+      })
+      if (!ok) return
+    }
+
+    setUpdatingId(apptId)
     try {
-      await updateAppointmentStatus(apptId, status)
-      onRefresh()
+      await updateAppointmentStatus(apptId, status, isDemo)
+      notify({
+        type: 'success',
+        title: 'Estado actualizado',
+        description:
+          status === 'completada'
+            ? 'Cita marcada como completada.'
+            : status === 'no_show'
+              ? 'No-show registrado correctamente.'
+              : 'Cita cancelada y horario liberado.',
+      })
+      if (isSandboxFallback && onSandboxStatusUpdate) {
+        onSandboxStatusUpdate(apptId, status)
+      } else {
+        onRefresh()
+      }
     } catch (err) {
-      console.error(err)
-      alert('Error al actualizar la cita.')
+      notify({
+        type: 'error',
+        title: 'Error al actualizar cita',
+        description: err instanceof Error ? err.message : undefined,
+      })
     } finally {
-      setProcessingId(null)
+      setUpdatingId(null)
     }
   }
 
-  // Manejar eliminación de bloqueo
   const handleDeleteBlock = async (id: string) => {
-    if (!confirm('¿Deseas desbloquear este horario?')) return
+    const confirmed = await confirmAction({
+      title: '¿Desbloquear este tramo horario?',
+      description:
+        'El intervalo volverá a aparecer como disponible si está dentro del horario comercial.',
+      confirmLabel: 'Desbloquear horario',
+      cancelLabel: 'Mantener bloqueo',
+      tone: 'neutral',
+    })
+    if (!confirmed) return
+
+    setUpdatingId(id)
     try {
-      await deleteBlockedSlot(id)
-      onRefresh()
+      await deleteBlockedSlot(id, isDemo)
+      notify({
+        type: 'success',
+        title: 'Tramo desbloqueado',
+      })
+      if (isSandboxFallback && onSandboxBlockDelete) {
+        onSandboxBlockDelete(id)
+      } else {
+        onRefresh()
+      }
     } catch (err) {
-      console.error(err)
-      alert('Error al eliminar bloqueo.')
+      notify({
+        type: 'error',
+        title: 'Error al eliminar bloqueo',
+        description: err instanceof Error ? err.message : undefined,
+      })
+    } finally {
+      setUpdatingId(null)
     }
   }
 
-  // Guardar nuevo bloqueo
-  const handleSaveBlock = async (data: {
-    fechaInicio: string
-    fechaFin: string
-    motivo: string
-  }) => {
-    await createBlockedSlot(data)
-    onRefresh()
+  const statusBadge = (estado: string) => {
+    switch (estado) {
+      case 'confirmada':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Confirmada
+          </span>
+        )
+      case 'completada':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-zinc-800 text-zinc-200 border border-white/10">
+            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+            Completada
+          </span>
+        )
+      case 'cancelada':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ui-badge-danger border">
+            <XCircle className="w-3 h-3" />
+            Cancelada
+          </span>
+        )
+      case 'no_show':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ui-badge-danger border">
+            <UserX className="w-3 h-3" />
+            No-Show
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/25">
+            {estado}
+          </span>
+        )
+    }
   }
 
   return (
     <div className="space-y-6">
-      {/* Controles superiores de la agenda */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-zinc-900/50 border border-white/10 backdrop-blur-md">
-        {/* Selector de modo y botones de día */}
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-xl bg-zinc-800/80 p-1 border border-white/5">
-            <button
-              type="button"
-              onClick={() => setViewMode('daily')}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-medium transition-all select-none',
-                viewMode === 'daily'
-                  ? 'bg-zinc-700 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              )}
-            >
-              Vista Diaria
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('weekly')}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-medium transition-all select-none',
-                viewMode === 'weekly'
-                  ? 'bg-zinc-700 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              )}
-            >
-              Vista Semanal
-            </button>
-          </div>
-
+      {/* Barra de controles superior */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Tabs de fecha rápida */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {dateTabs.map((tab) => {
+            const isActive = viewMode === 'day' && selectedDateKey === tab.key
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  setViewMode('day')
+                  setSelectedDateKey(tab.key)
+                }}
+                className={cn(
+                  'min-h-12 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all border shrink-0 active:scale-[0.98]',
+                  isActive
+                    ? 'ui-btn-contrast border-transparent font-semibold'
+                    : 'bg-zinc-900/60 border-white/10 text-zinc-300 hover:text-white hover:border-white/20'
+                )}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
           <button
             type="button"
-            onClick={handleToday}
-            className="px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+            onClick={() => setViewMode('upcoming')}
+            className={cn(
+              'min-h-12 px-4 rounded-xl text-xs font-medium whitespace-nowrap transition-all border shrink-0 active:scale-[0.98]',
+              viewMode === 'upcoming'
+                ? 'ui-btn-contrast border-transparent font-semibold'
+                : 'bg-zinc-900/60 border-white/10 text-zinc-300 hover:text-white hover:border-white/20'
+            )}
           >
-            Hoy
+            Próximas (+7 días)
           </button>
         </div>
 
-        {/* Navegador de fechas */}
-        <div className="flex items-center justify-between sm:justify-end gap-3">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handlePrevDay}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-              aria-label="Anterior"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+        {/* Selector de mes/fecha concreta y botón bloquear */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <label htmlFor="admin-jump-date" className="sr-only">
+            Ir a fecha específica
+          </label>
+          <input
+            id="admin-jump-date"
+            type="date"
+            value={selectedDateKey}
+            onChange={(e) => handleJumpDate(e.target.value)}
+            className="min-h-12 px-3 rounded-xl bg-zinc-900 border border-white/10 text-xs font-mono text-zinc-100 focus:outline-none focus:border-emerald-500/60"
+          />
 
-            <span className="text-xs sm:text-sm font-semibold text-zinc-100 capitalize px-2 font-mono">
-              {viewMode === 'daily'
-                ? formatDateFull(selectedDate)
-                : `Semana del ${selectedDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`}
-            </span>
-
-            <button
-              type="button"
-              onClick={handleNextDay}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-              aria-label="Siguiente"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Botón para abrir modal de bloqueo */}
           <button
             type="button"
-            onClick={() => setIsBlockModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition-all active:scale-95"
+            onClick={() => setShowBlockModal(true)}
+            className="min-h-12 px-4 rounded-xl bg-zinc-900 border border-white/10 hover:bg-zinc-800 hover:border-white/20 text-zinc-100 text-xs font-medium flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
           >
-            <Ban className="w-3.5 h-3.5" />
-            <span>Bloquear Horas/Día</span>
+            <Plus className="w-4 h-4 text-emerald-400" />
+            <span>Bloquear Horario / Día</span>
           </button>
         </div>
       </div>
 
-      {/* Grid de citas */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-sm font-semibold text-zinc-200 tracking-tight flex items-center gap-2">
-            <Clock className="w-4 h-4 text-emerald-400" />
-            <span>
-              Citas Programadas ({filteredAppointments.length})
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Columna principal: Agenda de Citas */}
+        <div className="lg:col-span-8 space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-zinc-400" />
+              <span>
+                {viewMode === 'day'
+                  ? formatDateFull(selectedDateKey, tz)
+                  : 'Próximas reservas confirmadas'}
+              </span>
+            </h3>
+            <span className="text-xs font-mono text-zinc-400">
+              {filteredAppointments.length} cita
+              {filteredAppointments.length === 1 ? '' : 's'}
             </span>
-          </h3>
-          <span className="text-xs text-zinc-500 font-mono">
-            Actualización en tiempo real
-          </span>
-        </div>
-
-        {filteredAppointments.length === 0 ? (
-          <div className="p-8 rounded-2xl bg-zinc-900/30 border border-white/5 text-center text-zinc-400 text-sm">
-            No hay citas programadas para el período seleccionado.
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {filteredAppointments.map((appt) => {
-              const client = appt.clients
-              const service = appt.services
-              const isProcessing = processingId === appt.id
 
-              return (
-                <motion.div
-                  key={appt.id}
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={cn(
-                    'p-4 sm:p-5 rounded-2xl border transition-all duration-200 backdrop-blur-md',
-                    appt.estado === 'completada'
-                      ? 'bg-zinc-900/30 border-white/5 opacity-80'
-                      : appt.estado === 'cancelada'
-                      ? 'bg-red-950/20 border-red-500/20 opacity-70'
-                      : 'bg-zinc-900/70 border-white/10 shadow-lg'
-                  )}
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    {/* Horario y Estado */}
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 rounded-xl bg-zinc-800/80 border border-white/10 text-center min-w-[85px] shrink-0">
-                        <span className="text-sm font-mono font-bold text-white block">
-                          {formatTime(appt.fecha_hora_inicio)}
+          {filteredAppointments.length === 0 ? (
+            <div className="p-10 rounded-2xl bg-zinc-900/30 border border-white/10 text-center space-y-2">
+              <p className="text-sm font-medium text-zinc-300">
+                No hay citas para mostrar aquí
+              </p>
+              <p className="text-xs text-zinc-400">
+                Tu link público de reservas está listo para recibir citas 24/7.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {filteredAppointments.map((appt) => {
+                const isUpdating = updatingId === appt.id
+                const isCancelled =
+                  appt.estado === 'cancelada' || appt.estado === 'no_show'
+
+                return (
+                  <div
+                    key={appt.id}
+                    className={cn(
+                      'p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4',
+                      isCancelled
+                        ? 'bg-zinc-900/20 border-white/5 opacity-70'
+                        : 'bg-zinc-900/60 border-white/10 hover:border-white/20 backdrop-blur-md'
+                    )}
+                  >
+                    <div className="flex items-start gap-3.5 min-w-0">
+                      <div className="px-3 py-2 rounded-xl bg-zinc-950 border border-white/10 text-center shrink-0 min-w-[78px]">
+                        <span className="block text-sm font-bold font-mono text-white">
+                          {formatTime(appt.fecha_hora_inicio, tz)}
                         </span>
-                        <span className="text-[11px] font-mono text-zinc-400 block">
-                          {formatTime(appt.fecha_hora_fin)}
+                        <span className="block text-[10px] font-mono text-zinc-400">
+                          {formatTime(appt.fecha_hora_fin, tz)}
                         </span>
                       </div>
 
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-semibold text-base text-zinc-100 tracking-tight">
-                            {service?.nombre || 'Servicio'}
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-medium text-sm sm:text-base text-zinc-100 truncate">
+                            {appt.client?.nombre || 'Cliente'}
                           </h4>
-                          <span
-                            className={cn(
-                              'text-[10px] font-mono uppercase px-2 py-0.5 rounded-md font-semibold',
-                              appt.estado === 'completada'
-                                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                                : appt.estado === 'cancelada'
-                                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            )}
-                          >
-                            {appt.estado}
-                          </span>
+                          {statusBadge(appt.estado)}
                         </div>
 
-                        {/* Datos del cliente */}
-                        <div className="flex items-center gap-3 text-xs text-zinc-300 flex-wrap">
-                          <span className="flex items-center gap-1 font-medium text-white">
-                            <User className="w-3.5 h-3.5 text-zinc-400" />
-                            {client?.nombre || 'Cliente sin nombre'}
+                        <p className="text-xs text-zinc-300 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="font-medium text-emerald-400">
+                            {appt.service?.nombre || 'Servicio'}
                           </span>
-                          {client?.telefono && (
-                            <a
-                              href={`https://wa.me/${client.telefono.replace(/[^0-9]/g, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-emerald-400 hover:underline font-mono text-[11px]"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                              <span>{client.telefono}</span>
-                            </a>
+                          <span className="text-zinc-500">•</span>
+                          <span className="font-mono text-zinc-200">
+                            {appt.service
+                              ? formatCurrency(Number(appt.service.precio))
+                              : '--'}
+                          </span>
+                          {viewMode === 'upcoming' && (
+                            <>
+                              <span className="text-zinc-500">•</span>
+                              <span className="text-zinc-400 capitalize">
+                                {formatDateFull(appt.fecha_hora_inicio, tz)}
+                              </span>
+                            </>
                           )}
-                          {client?.email && (
-                            <span className="text-zinc-500 text-[11px] font-mono truncate">
-                              {client.email}
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-zinc-400 font-mono">
+                          {appt.client?.telefono && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              {appt.client.telefono}
+                            </span>
+                          )}
+                          {appt.notas && (
+                            <span className="text-zinc-300 font-sans italic">
+                              &ldquo;{appt.notas}&rdquo;
                             </span>
                           )}
                         </div>
-
-                        {/* Precio y duración */}
-                        <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 pt-1">
-                          <span className="text-emerald-400 font-semibold">
-                            {formatCurrency(Number(service?.precio || 0))}
-                          </span>
-                          <span>•</span>
-                          <span>{service?.duracion_minutos || 45} min</span>
-                          <span>•</span>
-                          <span className="text-zinc-500 capitalize">
-                            {new Date(appt.fecha_hora_inicio).toLocaleDateString('es-ES', {
-                              weekday: 'short',
-                              day: 'numeric',
-                              month: 'short',
-                            })}
-                          </span>
-                        </div>
                       </div>
                     </div>
 
-                    {/* Acciones en 1 clic para el dueño */}
-                    <div className="flex items-center gap-2 self-end lg:self-center shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/5 w-full lg:w-auto justify-end">
-                      {appt.estado !== 'completada' && (
+                    {/* Acciones rápidas >= 48px */}
+                    {appt.estado === 'confirmada' && (
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <button
                           type="button"
-                          disabled={isProcessing}
-                          onClick={() => handleStatusChange(appt.id, 'completada')}
-                          className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950 text-xs font-semibold transition-all active:scale-95 flex items-center gap-1.5"
-                          title="Marcar cita como atendida y actualizar última visita del cliente"
+                          disabled={isUpdating}
+                          onClick={() =>
+                            handleUpdateStatus(appt.id, 'completada')
+                          }
+                          aria-label={`Marcar cita de ${appt.client?.nombre || 'cliente'} como completada`}
+                          className="min-h-12 min-w-12 px-3.5 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                         >
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          <span>Completada (1 clic)</span>
+                          {isUpdating ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          )}
+                          <span>Completar</span>
                         </button>
-                      )}
 
-                      {appt.estado !== 'cancelada' && (
                         <button
                           type="button"
-                          disabled={isProcessing}
-                          onClick={() => handleStatusChange(appt.id, 'cancelada')}
-                          className="px-3 py-2 rounded-xl bg-zinc-800 text-zinc-400 hover:bg-red-950/60 hover:text-red-300 hover:border-red-500/30 border border-white/5 text-xs font-medium transition-all active:scale-95 flex items-center gap-1.5"
+                          disabled={isUpdating}
+                          onClick={() => handleUpdateStatus(appt.id, 'no_show')}
+                          aria-label={`Registrar No-Show de ${appt.client?.nombre || 'cliente'}`}
+                          className="min-h-12 min-w-12 px-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 hover:bg-amber-500/20 text-xs font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>No-Show</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() =>
+                            handleUpdateStatus(appt.id, 'cancelada')
+                          }
+                          aria-label={`Cancelar cita de ${appt.client?.nombre || 'cliente'}`}
+                          className="min-h-12 min-w-12 px-3 rounded-xl ui-badge-danger border hover:opacity-90 text-xs font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                         >
                           <XCircle className="w-3.5 h-3.5" />
-                          <span>Cancelar</span>
+                          <span>Anular</span>
                         </button>
-                      )}
-
-                      {appt.estado === 'completada' && (
-                        <button
-                          type="button"
-                          disabled={isProcessing}
-                          onClick={() => handleStatusChange(appt.id, 'confirmada')}
-                          className="px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white text-xs"
-                        >
-                          Reabrir
-                        </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                </motion.div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Bloqueos Activos del Salón */}
-      <div className="p-5 rounded-2xl bg-zinc-900/40 border border-white/10 backdrop-blur-md space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Ban className="w-4 h-4 text-red-400" />
-            <h4 className="text-sm font-semibold text-zinc-200 tracking-tight">
-              Horas y Días Bloqueados ({blockedSlots.length})
-            </h4>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsBlockModalOpen(true)}
-            className="text-xs text-emerald-400 hover:underline flex items-center gap-1 font-mono"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Nuevo bloqueo</span>
-          </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        {blockedSlots.length === 0 ? (
-          <p className="text-xs text-zinc-500">
-            No hay bloqueos activos en el calendario. Todos los horarios estándar están disponibles.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {blockedSlots.map((block) => (
-              <div
-                key={block.id}
-                className="p-3 rounded-xl bg-zinc-950/50 border border-white/5 flex items-center justify-between gap-3 text-xs"
-              >
-                <div>
-                  <span className="font-semibold text-zinc-200 block">
-                    {block.motivo || 'Bloqueo programado'}
-                  </span>
-                  <span className="font-mono text-zinc-400 text-[11px]">
-                    {new Date(block.fecha_inicio).toLocaleDateString('es-ES', {
-                      day: 'numeric',
-                      month: 'short',
-                    })}{' '}
-                    • {formatTime(block.fecha_inicio)} - {formatTime(block.fecha_fin)}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleDeleteBlock(block.id)}
-                  className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors"
-                  title="Eliminar bloqueo y liberar horario"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+        {/* Columna derecha: Bloqueos activos */}
+        <div className="lg:col-span-4 space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+              <Lock className="w-4 h-4 text-red-400" />
+              <span>Bloqueos de Agenda</span>
+            </h3>
+            <span className="text-xs font-mono text-zinc-400">
+              {filteredBlocks.length}
+            </span>
           </div>
-        )}
+
+          {filteredBlocks.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-zinc-900/30 border border-white/10 text-center space-y-1.5">
+              <Clock className="w-6 h-6 text-zinc-400 mx-auto" />
+              <p className="text-xs font-medium text-zinc-300">
+                Sin bloqueos activos en este periodo
+              </p>
+              <p className="text-[11px] text-zinc-400">
+                Usa el botón &ldquo;Bloquear Horario&rdquo; si necesitas cerrar
+                horas o días puntuales.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {filteredBlocks.map((block) => (
+                <div
+                  key={block.id}
+                  className="p-3.5 rounded-2xl ui-badge-danger border flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium truncate">
+                      {block.motivo || 'Bloqueo manual'}
+                    </p>
+                    <p className="text-[11px] font-mono opacity-90 mt-0.5 capitalize">
+                      {formatDateFull(block.fecha_inicio, tz)} •{' '}
+                      {formatTime(block.fecha_inicio, tz)} -{' '}
+                      {formatTime(block.fecha_fin, tz)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={updatingId === block.id}
+                    onClick={() => handleDeleteBlock(block.id)}
+                    aria-label="Eliminar bloqueo de horario"
+                    className="min-w-12 min-h-12 rounded-xl bg-zinc-950/60 border border-white/10 text-zinc-200 hover:text-white flex items-center justify-center transition-colors shrink-0 active:scale-[0.98]"
+                  >
+                    {updatingId === block.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Modal para añadir bloqueo */}
       <AdminBlockSlotModal
-        isOpen={isBlockModalOpen}
-        onClose={() => setIsBlockModalOpen(false)}
-        onSave={handleSaveBlock}
+        isOpen={showBlockModal}
+        isDemo={isDemo}
+        isSandboxFallback={isSandboxFallback}
+        timezone={tz}
+        onClose={() => setShowBlockModal(false)}
+        onSuccess={(created) => {
+          if (isSandboxFallback && onSandboxBlockAdd && created) {
+            onSandboxBlockAdd(created)
+          } else {
+            onRefresh()
+          }
+        }}
       />
     </div>
   )

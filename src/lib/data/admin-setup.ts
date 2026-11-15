@@ -1,0 +1,96 @@
+import 'server-only'
+
+import { hasExplicitSessionSecret } from '@/lib/admin-session-token'
+import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
+import {
+  resolveTrustedDeploymentDomain,
+  verifyLicenseServer,
+  type LicenseVerificationResult,
+} from '@/lib/license'
+import type { BusinessSettings, Service } from '@/types/booking'
+
+export interface SetupDiagnosticsData {
+  hasSupabaseUrl: boolean
+  hasSupabaseAnonKey: boolean
+  hasServiceRole: boolean
+  hasResendKey: boolean
+  hasLicenseKey: boolean
+  hasAdminSecret: boolean
+  schemaReady: boolean
+  missingTables: string[]
+  license: LicenseVerificationResult
+}
+
+export interface InitialSetupPayload {
+  diagnostics: SetupDiagnosticsData
+  settings: BusinessSettings | null
+  services: Service[]
+}
+
+export async function getAdminSetupData(): Promise<InitialSetupPayload> {
+  const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim())
+  const hasSupabaseAnonKey = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  )
+  const hasServiceRole = hasSupabaseAdminConfig()
+  const hasResendKey = Boolean(
+    process.env.RESEND_API_KEY?.trim()?.startsWith('re_')
+  )
+  const hasLicenseKey = Boolean(process.env.LICENSE_KEY?.trim())
+  const hasAdminSecret = hasExplicitSessionSecret()
+
+  let schemaReady = false
+  const missingTables: string[] = []
+  let settings: BusinessSettings | null = null
+  let services: Service[] = []
+
+  if (hasServiceRole) {
+    const db = getSupabaseAdmin()
+    const [settingsRes, servicesRes, clientsRes, appointmentsRes] =
+      await Promise.all([
+        db
+          .from('business_settings')
+          .select('*')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        db
+          .from('services')
+          .select('*')
+          .eq('activo', true)
+          .order('orden', { ascending: true }),
+        db.from('clients').select('id').limit(1),
+        db.from('appointments').select('id').limit(1),
+      ])
+
+    if (settingsRes.error) missingTables.push('business_settings')
+    if (servicesRes.error) missingTables.push('services')
+    if (clientsRes.error) missingTables.push('clients')
+    if (appointmentsRes.error) missingTables.push('appointments')
+
+    schemaReady = missingTables.length === 0
+    settings = settingsRes.data ?? null
+    services = servicesRes.data ?? []
+  }
+
+  const license = await verifyLicenseServer({
+    domain: resolveTrustedDeploymentDomain(),
+    allowDomainBind: Boolean(resolveTrustedDeploymentDomain()),
+  })
+
+  return {
+    diagnostics: {
+      hasSupabaseUrl,
+      hasSupabaseAnonKey,
+      hasServiceRole,
+      hasResendKey,
+      hasLicenseKey,
+      hasAdminSecret,
+      schemaReady,
+      missingTables,
+      license,
+    },
+    settings,
+    services,
+  }
+}

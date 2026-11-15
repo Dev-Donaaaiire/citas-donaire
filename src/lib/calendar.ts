@@ -1,38 +1,43 @@
-import type { Appointment, BlockedSlot, BusinessSettings, TimeSlot } from '@/types/booking'
+import type {
+  Appointment,
+  BlockedSlot,
+  BusinessPublicSettings,
+  PublicBusyInterval,
+  TimeSlot,
+} from '@/types/booking'
 import { buildGoogleCalendarTemplateUrl, generateIcsContent } from '@/lib/ics'
-
-const DIAS_MAP: Record<number, string> = {
-  0: 'domingo',
-  1: 'lunes',
-  2: 'martes',
-  3: 'miercoles',
-  4: 'jueves',
-  5: 'viernes',
-  6: 'sabado',
-}
+import {
+  DEFAULT_BUSINESS_TIMEZONE,
+  getZonedDateParts,
+  getZonedDayOfWeek,
+  normalizeWorkingDays,
+  sanitizeTimeZone,
+  zonedDateTimeToUtc,
+} from '@/lib/timezone'
 
 /**
- * Convierte un objeto Date a string YYYY-MM-DD local
+ * Formatea una fecha a YYYY-MM-DD según la zona horaria del negocio
  */
-export function formatDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+export function formatDateKey(
+  date: Date | string,
+  timeZone: string | null = DEFAULT_BUSINESS_TIMEZONE
+): string {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+    return date.trim()
+  }
+  return getZonedDateParts(date, timeZone).isoDate
 }
 
 /**
- * Parsea string HH:mm o HH:mm:ss a minutos desde medianoche
+ * Convierte cadena HH:mm o HH:mm:ss a minutos desde medianoche
  */
 export function timeStringToMinutes(timeStr: string): number {
-  const parts = timeStr.split(':')
-  const hours = parseInt(parts[0] || '0', 10)
-  const minutes = parseInt(parts[1] || '0', 10)
+  const [hours = 0, minutes = 0] = timeStr.split(':').map(Number)
   return hours * 60 + minutes
 }
 
 /**
- * Convierte minutos desde medianoche a formato HH:mm
+ * Convierte minutos desde medianoche a cadena HH:mm
  */
 export function minutesToTimeString(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60)
@@ -41,7 +46,7 @@ export function minutesToTimeString(totalMinutes: number): string {
 }
 
 /**
- * Comprueba si dos intervalos de tiempo se solapan
+ * Verifica si dos intervalos de tiempo [startA, endA) y [startB, endB) se solapan
  */
 export function isOverlapping(
   startA: Date,
@@ -52,83 +57,108 @@ export function isOverlapping(
   return startA < endB && endA > startB
 }
 
+type SettingsForSlots = Pick<
+  BusinessPublicSettings,
+  'horario_apertura' | 'horario_cierre' | 'dias_laborables' | 'duracion_cita_minutos'
+> & {
+  timezone?: string | null
+}
+
 /**
- * Calcula los slots de tiempo disponibles para una fecha y duración dada,
- * cruzando con business_settings, appointments activos y blocked_slots.
+ * Calcula los slots disponibles para un día concreto y duración de servicio,
+ * interpretando siempre horarios y días en la zona horaria configurada del negocio.
  */
 export function calculateAvailableSlots({
-  targetDate,
-  durationMinutes,
+  date,
+  serviceDurationMinutes,
   settings,
+  busyIntervals,
   appointments,
   blockedSlots,
+  now = new Date(),
 }: {
-  targetDate: Date
-  durationMinutes: number
-  settings: BusinessSettings | null
-  appointments: Appointment[]
-  blockedSlots: BlockedSlot[]
+  date: Date | string
+  serviceDurationMinutes: number
+  settings: SettingsForSlots
+  busyIntervals?: PublicBusyInterval[]
+  appointments?: Pick<Appointment, 'fecha_hora_inicio' | 'fecha_hora_fin' | 'estado'>[]
+  blockedSlots?: Pick<BlockedSlot, 'fecha_inicio' | 'fecha_fin'>[]
+  now?: Date
 }): TimeSlot[] {
-  const dayOfWeekIndex = targetDate.getDay()
-  const dayName = DIAS_MAP[dayOfWeekIndex]
+  const tz = sanitizeTimeZone(settings.timezone)
+  const dateKey = formatDateKey(date, tz)
+  const dayOfWeek = getZonedDayOfWeek(dateKey)
 
-  // Configuración por defecto si no viene de la base de datos
-  const diasLaborables = Array.isArray(settings?.dias_laborables)
-    ? (settings.dias_laborables as string[])
-    : ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
+  const laborables = normalizeWorkingDays(settings.dias_laborables)
 
-  const isClosedDay = !diasLaborables.includes(dayName)
-
-  if (isClosedDay) {
+  if (!laborables.includes(dayOfWeek)) {
     return []
   }
 
-  const openingMinutes = timeStringToMinutes(settings?.horario_apertura || '09:00:00')
-  const closingMinutes = timeStringToMinutes(settings?.horario_cierre || '20:00:00')
-
-  // Paso entre slots (30 minutos o la duración si es menor)
-  const stepMinutes = Math.min(30, durationMinutes)
+  const openMin = timeStringToMinutes(settings.horario_apertura || '09:00')
+  const closeMin = timeStringToMinutes(settings.horario_cierre || '20:00')
+  const stepMin = Math.max(10, Number(settings.duracion_cita_minutos) || 30)
+  const durationMinutes = Math.max(5, Number(serviceDurationMinutes) || stepMin)
 
   const slots: TimeSlot[] = []
-  const now = new Date()
+  const todayKey = formatDateKey(now, tz)
+  const isPastDay = dateKey < todayKey
 
-  // Filtramos citas activas (no canceladas) para no iterar en vacío
-  const activeAppointments = appointments.filter((app) => app.estado !== 'cancelada')
+  const dayStartUtc = zonedDateTimeToUtc(dateKey, '00:00', tz)
+  const dayEndUtc = new Date(dayStartUtc.getTime() + 26 * 60 * 60 * 1000)
+
+  const activeAppointmentRanges: { start: Date; end: Date }[] = []
+  const blockedRanges: { start: Date; end: Date }[] = []
+
+  if (busyIntervals && busyIntervals.length > 0) {
+    for (const item of busyIntervals) {
+      const start = new Date(item.inicio)
+      const end = new Date(item.fin)
+      if (!isOverlapping(start, end, dayStartUtc, dayEndUtc)) continue
+      if (item.kind === 'blocked') {
+        blockedRanges.push({ start, end })
+      } else {
+        activeAppointmentRanges.push({ start, end })
+      }
+    }
+  }
+
+  if (appointments && appointments.length > 0) {
+    for (const a of appointments) {
+      if (a.estado === 'cancelada') continue
+      const start = new Date(a.fecha_hora_inicio)
+      const end = new Date(a.fecha_hora_fin)
+      if (isOverlapping(start, end, dayStartUtc, dayEndUtc)) {
+        activeAppointmentRanges.push({ start, end })
+      }
+    }
+  }
+
+  if (blockedSlots && blockedSlots.length > 0) {
+    for (const b of blockedSlots) {
+      const start = new Date(b.fecha_inicio)
+      const end = new Date(b.fecha_fin)
+      if (isOverlapping(start, end, dayStartUtc, dayEndUtc)) {
+        blockedRanges.push({ start, end })
+      }
+    }
+  }
+
+  // Pequeño margen mínimo de 15 minutos desde ahora si reservan para hoy
+  const minThreshold = new Date(now.getTime() + 15 * 60_000)
 
   for (
-    let currentMin = openingMinutes;
-    currentMin + durationMinutes <= closingMinutes;
-    currentMin += stepMinutes
+    let currentMin = openMin;
+    currentMin + durationMinutes <= closeMin;
+    currentMin += stepMin
   ) {
     const timeLabel = minutesToTimeString(currentMin)
-    const endMinutes = currentMin + durationMinutes
-    const endTimeLabel = minutesToTimeString(endMinutes)
-
-    const [startH, startM] = timeLabel.split(':').map(Number)
-    const [endH, endM] = endTimeLabel.split(':').map(Number)
-
-    const slotStartDate = new Date(
-      targetDate.getFullYear(),
-      targetDate.getMonth(),
-      targetDate.getDate(),
-      startH,
-      startM,
-      0,
-      0
-    )
-
+    const slotStartDate = zonedDateTimeToUtc(dateKey, timeLabel, tz)
     const slotEndDate = new Date(
-      targetDate.getFullYear(),
-      targetDate.getMonth(),
-      targetDate.getDate(),
-      endH,
-      endM,
-      0,
-      0
+      slotStartDate.getTime() + durationMinutes * 60_000
     )
 
-    // 1. ¿Está en el pasado?
-    if (slotStartDate <= now) {
+    if (isPastDay || slotStartDate <= minThreshold) {
       slots.push({
         time: timeLabel,
         datetime: slotStartDate.toISOString(),
@@ -139,32 +169,11 @@ export function calculateAvailableSlots({
       continue
     }
 
-    // 2. ¿Solapa con alguna cita activa?
-    const hasApptCollision = activeAppointments.some((appt) => {
-      const apptStart = new Date(appt.fecha_hora_inicio)
-      const apptEnd = new Date(appt.fecha_hora_fin)
-      return isOverlapping(slotStartDate, slotEndDate, apptStart, apptEnd)
-    })
+    const overlapsBlock = blockedRanges.some((range) =>
+      isOverlapping(slotStartDate, slotEndDate, range.start, range.end)
+    )
 
-    if (hasApptCollision) {
-      slots.push({
-        time: timeLabel,
-        datetime: slotStartDate.toISOString(),
-        endDatetime: slotEndDate.toISOString(),
-        isAvailable: false,
-        reason: 'booked',
-      })
-      continue
-    }
-
-    // 3. ¿Solapa con algún bloqueo de horario / día?
-    const hasBlockedCollision = blockedSlots.some((block) => {
-      const blockStart = new Date(block.fecha_inicio)
-      const blockEnd = new Date(block.fecha_fin)
-      return isOverlapping(slotStartDate, slotEndDate, blockStart, blockEnd)
-    })
-
-    if (hasBlockedCollision) {
+    if (overlapsBlock) {
       slots.push({
         time: timeLabel,
         datetime: slotStartDate.toISOString(),
@@ -175,7 +184,21 @@ export function calculateAvailableSlots({
       continue
     }
 
-    // Si pasa todas las validaciones, está libre
+    const overlapsAppointment = activeAppointmentRanges.some((range) =>
+      isOverlapping(slotStartDate, slotEndDate, range.start, range.end)
+    )
+
+    if (overlapsAppointment) {
+      slots.push({
+        time: timeLabel,
+        datetime: slotStartDate.toISOString(),
+        endDatetime: slotEndDate.toISOString(),
+        isAvailable: false,
+        reason: 'booked',
+      })
+      continue
+    }
+
     slots.push({
       time: timeLabel,
       datetime: slotStartDate.toISOString(),
@@ -188,31 +211,33 @@ export function calculateAvailableSlots({
 }
 
 /**
- * Obtiene los días del mes para el calendario (formato Lunes a Domingo)
+ * Obtiene los días del mes para el calendario (formato Lunes a Domingo),
+ * representados al mediodía en la zona horaria del negocio para evitar desfases.
  */
-export function getMonthDaysGrid(year: number, monthIndex: number) {
-  const firstDayOfMonth = new Date(year, monthIndex, 1)
-  const lastDayOfMonth = new Date(year, monthIndex + 1, 0)
-  const totalDays = lastDayOfMonth.getDate()
+export function getMonthDaysGrid(
+  year: number,
+  monthIndex: number,
+  timeZone: string | null = DEFAULT_BUSINESS_TIMEZONE
+): (Date | null)[] {
+  const tz = sanitizeTimeZone(timeZone)
+  const mm = String(monthIndex + 1).padStart(2, '0')
+  const firstDayIso = `${year}-${mm}-01`
+  const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
 
-  // Día de la semana del primer día (0 = Domingo, 1 = Lunes, etc.)
-  // Lo convertimos a Lunes = 0, Domingo = 6
-  let firstDayWeekday = firstDayOfMonth.getDay() - 1
-  if (firstDayWeekday === -1) firstDayWeekday = 6
+  // Lunes = 0, Domingo = 6
+  const startDayOfWeek = (getZonedDayOfWeek(firstDayIso) + 6) % 7
+  const grid: (Date | null)[] = []
 
-  const days: (Date | null)[] = []
-
-  // Relleno de días en blanco antes del primer día
-  for (let i = 0; i < firstDayWeekday; i++) {
-    days.push(null)
+  for (let i = 0; i < startDayOfWeek; i++) {
+    grid.push(null)
   }
 
-  // Días del mes
-  for (let d = 1; d <= totalDays; d++) {
-    days.push(new Date(year, monthIndex, d))
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dd = String(d).padStart(2, '0')
+    grid.push(zonedDateTimeToUtc(`${year}-${mm}-${dd}`, '12:00', tz))
   }
 
-  return days
+  return grid
 }
 
 /**
@@ -227,14 +252,14 @@ export function generateGoogleCalendarUrl({
 }: {
   title: string
   description: string
-  location?: string
+  location?: string | null
   startDate: Date
   endDate: Date
 }): string {
   return buildGoogleCalendarTemplateUrl({
     title,
     description,
-    location,
+    location: location || undefined,
     startDate,
     endDate,
   })
@@ -249,34 +274,35 @@ export function downloadIcsFile({
   location,
   startDate,
   endDate,
-  url,
-  filename = 'cita-donaire.ics',
+  organizerName,
+  organizerEmail,
 }: {
   title: string
   description: string
-  location?: string
+  location?: string | null
   startDate: Date
   endDate: Date
-  url?: string
-  filename?: string
-}) {
+  organizerName?: string
+  organizerEmail?: string
+}): void {
   const icsContent = generateIcsContent({
     title,
     description,
-    location,
+    location: location || undefined,
     startDate,
     endDate,
-    url,
+    organizerName,
+    organizerEmail,
     method: 'PUBLISH',
   })
 
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
-  const blobUrl = URL.createObjectURL(blob)
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = blobUrl
-  a.download = filename
+  a.href = url
+  a.download = 'reserva-cita.ics'
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  URL.revokeObjectURL(blobUrl)
+  URL.revokeObjectURL(url)
 }

@@ -1,447 +1,547 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Search,
   MessageCircle,
-  Mail,
-  ShieldAlert,
-  ShieldCheck,
-  Clock,
-  Sparkles,
-  CheckCircle2,
+  Ban,
+  CheckCircle,
   Loader2,
+  Mail,
+  Check,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import type { Client } from '@/types/booking'
-import { formatRelativeDays, formatDateFull, getDaysSince } from '@/lib/format'
-import { generateWhatsAppReminderUrl } from '@/lib/reminder-utils'
-import { toggleClientBlacklist } from '@/lib/booking-service'
+import {
+  formatRelativeDays,
+  formatDateFull,
+  getDaysSince,
+} from '@/lib/format'
+import {
+  sendRetentionReminder,
+  toggleClientBlacklist,
+} from '@/lib/booking-service'
 import { cn } from '@/lib/utils'
+import { useFeedback } from '@/components/ui/FeedbackProvider'
 
 interface AdminClientRetentionTableProps {
   clients: Client[]
-  onRefresh: () => void
+  pagination: {
+    page: number
+    pageSize: number
+    totalFiltered: number
+    totalClients: number
+    atRiskCount: number
+    blockedCount: number
+  }
+  timezone?: string | null
   businessName?: string
+  isDemo?: boolean
+  isSandboxFallback?: boolean
+  activeFilter: 'all' | 'risk' | 'blocked'
+  searchQuery: string
+  onQueryChange: (params: {
+    page?: number
+    filter?: 'all' | 'risk' | 'blocked'
+    search?: string
+  }) => void
+  onRefresh: () => void
+  onSandboxBlacklistToggle?: (clientId: string, newStatus: boolean) => void
 }
 
 export function AdminClientRetentionTable({
   clients,
+  pagination,
+  timezone = 'Europe/Madrid',
+  businessName = 'Krono Studio',
+  isDemo = false,
+  isSandboxFallback = false,
+  activeFilter,
+  searchQuery,
+  onQueryChange,
   onRefresh,
-  businessName = 'Krono / Donaire Salon',
+  onSandboxBlacklistToggle,
 }: AdminClientRetentionTableProps) {
-  const [filterMode, setFilterMode] = useState<'risk' | 'all' | 'blacklisted'>('risk')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [togglingId, setTogglingId] = useState<string | null>(null)
-  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
+  const { notify, confirmAction } = useFeedback()
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 3500)
+  const [localSearch, setLocalSearch] = useState(searchQuery)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [emailingId, setEmailingId] = useState<string | null>(null)
+  const [emailedIds, setEmailedIds] = useState<Record<string, boolean>>({})
+  const emailTimersRef = useRef<Record<string, number>>({})
+  const searchDebounceRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const activeTimers = emailTimersRef.current
+    return () => {
+      Object.values(activeTimers).forEach((timerId) =>
+        window.clearTimeout(timerId)
+      )
+      if (searchDebounceRef.current !== null) {
+        window.clearTimeout(searchDebounceRef.current)
+      }
+    }
+  }, [])
+
+  const handleSearchInput = (value: string) => {
+    setLocalSearch(value)
+    if (searchDebounceRef.current !== null) {
+      window.clearTimeout(searchDebounceRef.current)
+    }
+    searchDebounceRef.current = window.setTimeout(() => {
+      onQueryChange({ search: value, page: 1 })
+    }, 300)
   }
 
-  // Filtrado reactivo de clientes
-  const filteredClients = useMemo(() => {
-    let result = clients
-
-    // 1. Filtro por estado
-    if (filterMode === 'risk') {
-      result = result.filter((c) => {
-        const days = getDaysSince(c.ultima_visita)
-        return days >= 30
-      })
-    } else if (filterMode === 'blacklisted') {
-      result = result.filter((c) => c.bloqueado_no_show)
-    }
-
-    // 2. Filtro por buscador
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(q) ||
-          c.email.toLowerCase().includes(q) ||
-          (c.telefono && c.telefono.toLowerCase().includes(q))
-      )
-    }
-
-    return result
-  }, [clients, filterMode, searchQuery])
-
-  // Contadores para los badges
-  const atRiskCount = useMemo(
-    () => clients.filter((c) => getDaysSince(c.ultima_visita) >= 30).length,
-    [clients]
-  )
-
-  const blacklistedCount = useMemo(
-    () => clients.filter((c) => c.bloqueado_no_show).length,
-    [clients]
-  )
-
-  // Alternar lista negra de no-show en 1 clic
-  const handleToggleBlacklist = async (client: Client) => {
+  const handleToggleBlock = async (client: Client) => {
     const isBlocking = !client.bloqueado_no_show
-    const confirmText = isBlocking
-      ? `¿Deseas bloquear a ${client.nombre} por inasistencia (no-show)? No podrá reservar online con el correo ${client.email}.`
-      : `¿Deseas desbloquear a ${client.nombre} para que vuelva a reservar online?`
+    const confirmed = await confirmAction({
+      title: isBlocking
+        ? `¿Bloquear a ${client.nombre}?`
+        : `¿Desbloquear a ${client.nombre}?`,
+      description: isBlocking
+        ? 'Si lo bloqueas por no-show, no podrá reservar citas nuevas online desde la web.'
+        : 'Este cliente podrá volver a reservar citas con normalidad.',
+      confirmLabel: isBlocking ? 'Sí, bloquear cliente' : 'Sí, desbloquear',
+      cancelLabel: 'Cancelar',
+      tone: isBlocking ? 'danger' : 'neutral',
+    })
+    if (!confirmed) return
 
-    if (!confirm(confirmText)) return
-
-    setTogglingId(client.id)
+    setUpdatingId(client.id)
     try {
-      await toggleClientBlacklist(client.id, client.bloqueado_no_show)
-      showToast(
-        isBlocking
-          ? `${client.nombre} añadido a la lista negra.`
-          : `${client.nombre} desbloqueado con éxito.`
+      const res = await toggleClientBlacklist(
+        client.id,
+        client.bloqueado_no_show,
+        isDemo
       )
-      onRefresh()
+      notify({
+        type: 'success',
+        title: res.newStatus ? 'Cliente bloqueado' : 'Cliente desbloqueado',
+        description: `${client.nombre} actualizado correctamente.`,
+      })
+      if (isSandboxFallback && onSandboxBlacklistToggle) {
+        onSandboxBlacklistToggle(client.id, res.newStatus)
+      } else {
+        onRefresh()
+      }
     } catch (err) {
-      console.error(err)
-      alert('Error al actualizar el estado del cliente.')
+      notify({
+        type: 'error',
+        title: 'No se pudo actualizar el cliente',
+        description: err instanceof Error ? err.message : undefined,
+      })
     } finally {
-      setTogglingId(null)
+      setUpdatingId(null)
     }
   }
 
-  // Enviar recordatorio por WhatsApp
-  const handleSendWhatsApp = (client: Client) => {
-    const url = generateWhatsAppReminderUrl({
-      phone: client.telefono,
-      clientName: client.nombre,
-      businessName,
-    })
-
-    if (!url) {
-      alert('Este cliente no tiene un teléfono registrado para WhatsApp.')
+  const handleSendWhatsAppReminder = (client: Client) => {
+    const cleanPhone = (client.telefono || '').replace(/[^\d]/g, '')
+    if (!cleanPhone) {
+      notify({
+        type: 'error',
+        title: 'Teléfono no registrado',
+        description: 'Este cliente no tiene un número válido para WhatsApp.',
+      })
       return
     }
-
-    window.open(url, '_blank')
-    showToast(`Mensaje de reactivación generado para ${client.nombre}`)
+    const firstName = client.nombre.split(' ')[0]
+    const bookingUrl = `${window.location.origin}${isDemo ? '/demo' : '/reservar'}`
+    const text = `¡Hola ${firstName}! Hace ya unos días que no te vemos por ${businessName}. Te echamos de menos, si te apetece reservar tu próximo hueco aquí lo tienes en 1 clic: ${bookingUrl}`
+    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`
+    window.open(waUrl, '_blank', 'noopener,noreferrer')
   }
 
-  // Enviar recordatorio por Email mediante Resend
-  const handleSendEmail = async (client: Client) => {
-    setSendingEmailId(client.id)
+  const handleSendEmailReminder = async (client: Client) => {
+    setEmailingId(client.id)
     try {
-      const res = await fetch('/api/notifications/reminder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientName: client.nombre,
-          clientEmail: client.email,
-          businessName,
-          lastVisit: client.ultima_visita,
-        }),
+      const data = await sendRetentionReminder(client.id, isDemo)
+      setEmailedIds((prev) => ({ ...prev, [client.id]: true }))
+      notify({
+        type: 'success',
+        title: data.simulated
+          ? 'Recordatorio simulado (Demo/Resend sandbox)'
+          : 'Recordatorio enviado por email',
+        description: `Destinatario: ${client.email}`,
       })
-
-      const data = (await res.json()) as { simulated?: boolean; error?: string }
-
-      if (!res.ok) {
-        throw new Error(data.error || 'No se pudo enviar el recordatorio.')
+      if (emailTimersRef.current[client.id]) {
+        window.clearTimeout(emailTimersRef.current[client.id])
       }
-
-      showToast(
-        data.simulated
-          ? `✉️ Recordatorio procesado para ${client.nombre} (configura RESEND_API_KEY para envío en vivo)`
-          : `✉️ Recordatorio enviado por email a ${client.nombre} (${client.email})`
-      )
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Error al enviar el recordatorio.'
-      alert(msg)
+      emailTimersRef.current[client.id] = window.setTimeout(() => {
+        setEmailedIds((prev) => ({ ...prev, [client.id]: false }))
+      }, 3500)
+    } catch (err) {
+      notify({
+        type: 'error',
+        title: 'Error enviando el recordatorio',
+        description: err instanceof Error ? err.message : undefined,
+      })
     } finally {
-      setSendingEmailId(null)
+      setEmailingId(null)
     }
   }
 
+  const totalPages = Math.max(
+    1,
+    Math.ceil(pagination.totalFiltered / Math.max(1, pagination.pageSize))
+  )
+
   return (
-    <div className="space-y-6">
-      {/* Toast flotante de confirmación */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-2xl bg-emerald-500 text-zinc-950 font-semibold text-xs shadow-2xl flex items-center gap-2 border border-emerald-400"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Tarjeta de propuesta de valor */}
-      <div className="p-5 rounded-2xl bg-zinc-900/60 border border-amber-500/30 backdrop-blur-md relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <h3 className="text-base font-bold text-white tracking-tight">
-                Motor de Retención & Seguimiento Automático
-              </h3>
-            </div>
-            <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
-              Detecta clientes cuya última visita fue hace <strong>más de 30 días</strong> y
-              reactívalos con recordatorios persuasivos en 1 clic. Bloquea de inmediato a quienes no
-              se presentan (no-shows) para proteger la facturación de tu agenda.
-            </p>
-          </div>
-
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center shrink-0">
-            <span className="text-2xl font-mono font-bold text-amber-400 block leading-tight">
-              {atRiskCount}
-            </span>
-            <span className="text-[10px] font-mono text-amber-300/80 uppercase">
-              Para reactivar
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Barra de filtros y búsqueda */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Pestañas de filtro */}
-        <div className="flex rounded-xl bg-zinc-900/60 p-1 border border-white/10 shrink-0">
+    <div className="space-y-4">
+      {/* Cabecera de Filtros y Búsqueda */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setFilterMode('risk')}
+            onClick={() => onQueryChange({ filter: 'all', page: 1 })}
             className={cn(
-              'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all select-none flex items-center gap-1.5',
-              filterMode === 'risk'
-                ? 'bg-amber-500 text-zinc-950 shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+              'min-h-12 px-4 rounded-xl text-xs font-medium transition-all border active:scale-[0.98]',
+              activeFilter === 'all'
+                ? 'ui-btn-contrast border-transparent font-semibold'
+                : 'bg-zinc-900/60 border-white/10 text-zinc-300 hover:text-white'
             )}
           >
-            <span>En riesgo (+30 días)</span>
-            <span
-              className={cn(
-                'px-1.5 py-0.2 rounded-full text-[10px] font-mono',
-                filterMode === 'risk' ? 'bg-zinc-950/20 text-zinc-950' : 'bg-zinc-800 text-zinc-300'
-              )}
-            >
-              {atRiskCount}
-            </span>
+            Todos ({pagination.totalClients})
           </button>
 
           <button
             type="button"
-            onClick={() => setFilterMode('all')}
+            onClick={() => onQueryChange({ filter: 'risk', page: 1 })}
             className={cn(
-              'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all select-none flex items-center gap-1.5',
-              filterMode === 'all'
-                ? 'bg-zinc-700 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+              'min-h-12 px-4 rounded-xl text-xs font-medium transition-all border flex items-center gap-1.5 active:scale-[0.98]',
+              activeFilter === 'risk'
+                ? 'bg-amber-500 text-zinc-950 border-amber-400 font-semibold'
+                : 'bg-zinc-900/60 border-white/10 text-amber-300 hover:border-amber-500/40'
             )}
           >
-            <span>Todos ({clients.length})</span>
+            <span>Sin volver +30d ({pagination.atRiskCount})</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setFilterMode('blacklisted')}
+            onClick={() => onQueryChange({ filter: 'blocked', page: 1 })}
             className={cn(
-              'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all select-none flex items-center gap-1.5',
-              filterMode === 'blacklisted'
-                ? 'bg-red-500 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+              'min-h-12 px-4 rounded-xl text-xs font-medium transition-all border active:scale-[0.98]',
+              activeFilter === 'blocked'
+                ? 'ui-btn-danger font-semibold'
+                : 'bg-zinc-900/60 border-white/10 text-zinc-300 hover:border-red-500/40'
             )}
           >
-            <span>Lista Negra</span>
-            {blacklistedCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-red-950 text-red-200">
-                {blacklistedCount}
-              </span>
-            )}
+            Bloqueados ({pagination.blockedCount})
           </button>
         </div>
 
         {/* Buscador */}
-        <div className="relative flex-1 max-w-xs">
-          <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="relative w-full md:w-72">
+          <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <label htmlFor="clients-search" className="sr-only">
+            Buscar clientes por nombre, email o teléfono
+          </label>
           <input
+            id="clients-search"
             type="text"
-            placeholder="Buscar por nombre, email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900/60 border border-white/10 text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-amber-500/60 transition-colors"
+            placeholder="Buscar cliente, email o tel..."
+            value={localSearch}
+            onChange={(e) => handleSearchInput(e.target.value)}
+            className="w-full min-h-12 pl-10 pr-4 rounded-xl bg-zinc-900/60 border border-white/10 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60"
           />
         </div>
       </div>
 
-      {/* Tabla inteligente de clientes */}
-      <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md overflow-hidden shadow-xl">
+      {/* Vista móvil (Tarjetas apiladas < md) */}
+      <div className="md:hidden space-y-3">
+        {clients.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-zinc-900/40 border border-white/10 text-center text-xs text-zinc-400">
+            No hay clientes que coincidan con este filtro.
+          </div>
+        ) : (
+          clients.map((client) => {
+            const daysSince = getDaysSince(client.ultima_visita)
+            const isAtRisk = daysSince >= 30 && !client.bloqueado_no_show
+
+            return (
+              <div
+                key={client.id}
+                className={cn(
+                  'p-4 rounded-2xl border space-y-3',
+                  client.bloqueado_no_show
+                    ? 'ui-badge-danger'
+                    : 'bg-zinc-900/60 border-white/10'
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-sm text-white truncate">
+                      {client.nombre}
+                    </h4>
+                    <p className="text-xs font-mono text-zinc-400 truncate mt-0.5">
+                      {client.telefono} · {client.email}
+                    </p>
+                  </div>
+                  {client.bloqueado_no_show ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium ui-badge-danger border shrink-0">
+                      Bloqueado
+                    </span>
+                  ) : isAtRisk ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0">
+                      Riesgo +30d
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                      Activo
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-zinc-300 pt-1 border-t border-white/10">
+                  <span className="font-mono">
+                    {client.total_citas} cita
+                    {client.total_citas === 1 ? '' : 's'}
+                  </span>
+                  <span>
+                    Última visita: {formatRelativeDays(client.ultima_visita)}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {!client.bloqueado_no_show && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleSendWhatsAppReminder(client)}
+                        aria-label={`Enviar WhatsApp de reactivación a ${client.nombre}`}
+                        className="flex-1 min-h-12 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>WhatsApp</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={emailingId === client.id}
+                        onClick={() => handleSendEmailReminder(client)}
+                        aria-label={`Enviar email de reactivación a ${client.nombre}`}
+                        className="flex-1 min-h-12 px-3 rounded-xl bg-zinc-950 border border-white/10 text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {emailingId === client.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : emailedIds[client.id] ? (
+                          <Check className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <Mail className="w-4 h-4" />
+                        )}
+                        <span>Email</span>
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={updatingId === client.id}
+                    onClick={() => handleToggleBlock(client)}
+                    aria-label={
+                      client.bloqueado_no_show
+                        ? `Desbloquear a ${client.nombre}`
+                        : `Bloquear a ${client.nombre} por no-show`
+                    }
+                    className={cn(
+                      'min-h-12 px-3 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 border transition-all active:scale-[0.98] disabled:opacity-50',
+                      client.bloqueado_no_show
+                        ? 'w-full bg-zinc-950 border-white/15 text-zinc-100'
+                        : 'bg-zinc-950 border-white/10 text-zinc-300'
+                    )}
+                  >
+                    {updatingId === client.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : client.bloqueado_no_show ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <span>Desbloquear</span>
+                      </>
+                    ) : (
+                      <>
+                        <Ban className="w-4 h-4" />
+                        <span>Bloquear</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Tabla Desktop (>= md) */}
+      <div className="hidden md:block rounded-2xl bg-zinc-900/40 border border-white/10 backdrop-blur-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/10 bg-zinc-900/80 text-zinc-400 font-mono text-[11px] uppercase tracking-wider">
+              <tr className="border-b border-white/10 text-[11px] font-mono uppercase tracking-wider text-zinc-400 bg-zinc-950/50">
                 <th className="py-3.5 px-4 font-medium">Cliente</th>
+                <th className="py-3.5 px-4 font-medium">Contacto</th>
+                <th className="py-3.5 px-4 font-medium">Citas</th>
                 <th className="py-3.5 px-4 font-medium">Última Visita</th>
-                <th className="py-3.5 px-4 font-medium text-center">Citas</th>
-                <th className="py-3.5 px-4 font-medium">Estado</th>
-                <th className="py-3.5 px-4 font-medium text-right">Acciones en 1 Clic</th>
+                <th className="py-3.5 px-4 font-medium text-right">
+                  Acciones / Retención
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredClients.length === 0 ? (
+            <tbody className="divide-y divide-white/5 text-sm">
+              {clients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-zinc-500 text-xs">
-                    No se encontraron clientes para este filtro.
+                  <td
+                    colSpan={5}
+                    className="py-10 text-center text-zinc-400 text-xs"
+                  >
+                    No hay clientes que coincidan con este filtro.
                   </td>
                 </tr>
               ) : (
-                filteredClients.map((client) => {
+                clients.map((client) => {
                   const daysSince = getDaysSince(client.ultima_visita)
-                  const isInactive = daysSince >= 30
-                  const isToggling = togglingId === client.id
+                  const isAtRisk = daysSince >= 30 && !client.bloqueado_no_show
 
                   return (
-                    <motion.tr
+                    <tr
                       key={client.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
                       className={cn(
-                        'hover:bg-zinc-800/40 transition-colors',
-                        client.bloqueado_no_show && 'bg-red-950/10'
+                        'transition-colors hover:bg-white/[0.02]',
+                        client.bloqueado_no_show && 'bg-red-950/15'
                       )}
                     >
-                      {/* Cliente */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-zinc-800 border border-white/10 flex items-center justify-center font-bold text-zinc-200 shrink-0 text-xs font-mono">
-                            {client.nombre.slice(0, 2).toUpperCase()}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-xs font-semibold text-zinc-200 shrink-0">
+                            {client.nombre.charAt(0).toUpperCase()}
                           </div>
-                          <div className="min-w-0">
-                            <span className="font-semibold text-zinc-100 text-sm block truncate">
+                          <div>
+                            <p className="font-medium text-zinc-100">
                               {client.nombre}
-                            </span>
-                            <div className="flex items-center gap-2 text-zinc-400 text-[11px] font-mono mt-0.5">
-                              <span className="truncate">{client.email}</span>
-                              {client.telefono && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-zinc-500">{client.telefono}</span>
-                                </>
-                              )}
-                            </div>
-                            {client.notas && (
-                              <p className="text-[10px] text-zinc-500 truncate max-w-xs mt-0.5">
-                                Nota: {client.notas}
-                              </p>
+                            </p>
+                            {client.no_shows > 0 && (
+                              <span className="text-[11px] text-red-400 font-mono">
+                                {client.no_shows} no-show
+                                {client.no_shows > 1 ? 's' : ''}
+                              </span>
                             )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Última Visita */}
-                      <td className="py-4 px-4 font-mono">
-                        <div>
+                      <td className="py-3.5 px-4 font-mono text-xs text-zinc-300">
+                        <div>{client.telefono}</div>
+                        <div className="text-[11px] text-zinc-400">
+                          {client.email}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4 font-mono text-zinc-200">
+                        {client.total_citas}
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-0.5">
                           <span
                             className={cn(
-                              'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold',
-                              isInactive
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border',
+                              client.bloqueado_no_show
+                                ? 'ui-badge-danger'
+                                : isAtRisk
+                                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                             )}
                           >
-                            <Clock className="w-3 h-3" />
-                            <span>{formatRelativeDays(client.ultima_visita)}</span>
+                            {client.bloqueado_no_show
+                              ? 'Lista Negra'
+                              : formatRelativeDays(client.ultima_visita)}
                           </span>
-                          <span className="block text-[10px] text-zinc-500 mt-1 capitalize font-sans">
-                            {client.ultima_visita
-                              ? formatDateFull(client.ultima_visita)
-                              : 'Sin historial'}
-                          </span>
+                          {client.ultima_visita && (
+                            <p className="text-[11px] text-zinc-400 pl-1 capitalize">
+                              {formatDateFull(client.ultima_visita, timezone)}
+                            </p>
+                          )}
                         </div>
                       </td>
 
-                      {/* Citas Totales */}
-                      <td className="py-4 px-4 text-center font-mono">
-                        <span className="text-sm font-semibold text-zinc-200">
-                          {client.total_citas}
-                        </span>
-                      </td>
-
-                      {/* Estado */}
-                      <td className="py-4 px-4">
-                        {client.bloqueado_no_show ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-red-500/20 text-red-300 border border-red-500/30">
-                            <ShieldAlert className="w-3 h-3 text-red-400" />
-                            <span>Lista Negra</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
-                            <ShieldCheck className="w-3 h-3" />
-                            <span>Habilitado</span>
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Acciones en 1 clic */}
-                      <td className="py-4 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Botón WhatsApp 1 Clic */}
-                          {client.telefono && (
-                            <button
-                              type="button"
-                              onClick={() => handleSendWhatsApp(client)}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950 font-medium text-xs transition-all active:scale-95 flex items-center gap-1"
-                              title="Enviar recordatorio automático por WhatsApp en 1 clic"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">WhatsApp (1 clic)</span>
-                            </button>
+                          {!client.bloqueado_no_show && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleSendWhatsAppReminder(client)
+                                }
+                                aria-label={`Recordar por WhatsApp a ${client.nombre}`}
+                                className="min-h-12 min-w-12 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                                <span className="hidden lg:inline">
+                                  WhatsApp
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={emailingId === client.id}
+                                onClick={() => handleSendEmailReminder(client)}
+                                aria-label={`Recordar por email a ${client.nombre}`}
+                                className={cn(
+                                  'min-h-12 min-w-12 px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-50',
+                                  emailedIds[client.id]
+                                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                                    : 'bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800'
+                                )}
+                              >
+                                {emailingId === client.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : emailedIds[client.id] ? (
+                                  <Check className="w-4 h-4" />
+                                ) : (
+                                  <Mail className="w-4 h-4" />
+                                )}
+                                <span className="hidden xl:inline">
+                                  {emailedIds[client.id] ? 'Enviado' : 'Email'}
+                                </span>
+                              </button>
+                            </>
                           )}
 
-                          {/* Botón Enviar Recordatorio por Email (Resend) */}
                           <button
                             type="button"
-                            disabled={sendingEmailId === client.id}
-                            onClick={() => handleSendEmail(client)}
-                            className="px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white hover:bg-zinc-700 font-medium text-xs transition-all active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
-                            title="Enviar recordatorio cordial por Email con enlace de reserva"
-                          >
-                            {sendingEmailId === client.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                            ) : (
-                              <Mail className="w-3.5 h-3.5" />
-                            )}
-                            <span className="hidden sm:inline">
-                              {sendingEmailId === client.id
-                                ? 'Enviando...'
-                                : 'Enviar recordatorio'}
-                            </span>
-                          </button>
-
-                          {/* Botón Bloquear / Desbloquear No-Show */}
-                          <button
-                            type="button"
-                            disabled={isToggling}
-                            onClick={() => handleToggleBlacklist(client)}
-                            className={cn(
-                              'px-2.5 py-1.5 rounded-lg font-medium text-xs transition-all active:scale-95 flex items-center gap-1 border',
+                            disabled={updatingId === client.id}
+                            onClick={() => handleToggleBlock(client)}
+                            aria-label={
                               client.bloqueado_no_show
-                                ? 'bg-zinc-800 text-zinc-300 border-white/10 hover:bg-zinc-700'
-                                : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500 hover:text-white'
-                            )}
-                            title={
-                              client.bloqueado_no_show
-                                ? 'Desbloquear y sacar de la lista negra'
-                                : 'Bloquear cliente por no presentarse (no-show)'
+                                ? `Desbloquear a ${client.nombre}`
+                                : `Bloquear a ${client.nombre} por no-show`
                             }
+                            className={cn(
+                              'min-h-12 min-w-12 px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-50',
+                              client.bloqueado_no_show
+                                ? 'bg-zinc-800 border-white/15 text-zinc-100 hover:bg-zinc-700'
+                                : 'bg-zinc-950 border-white/10 text-zinc-300 hover:text-red-300 hover:border-red-500/30'
+                            )}
                           >
-                            <ShieldAlert className="w-3.5 h-3.5" />
-                            <span className="hidden md:inline">
-                              {client.bloqueado_no_show ? 'Desbloquear' : 'Bloquear No-Show'}
+                            {updatingId === client.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : client.bloqueado_no_show ? (
+                              <CheckCircle className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <Ban className="w-4 h-4" />
+                            )}
+                            <span>
+                              {client.bloqueado_no_show
+                                ? 'Desbloquear'
+                                : 'Bloquear'}
                             </span>
                           </button>
                         </div>
                       </td>
-                    </motion.tr>
+                    </tr>
                   )
                 })
               )}
@@ -449,6 +549,38 @@ export function AdminClientRetentionTable({
           </table>
         </div>
       </div>
+
+      {/* Paginación accesible */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2 text-xs text-zinc-400">
+          <span className="font-mono">
+            Página {pagination.page} de {totalPages} ·{' '}
+            {pagination.totalFiltered} resultados
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={pagination.page <= 1}
+              onClick={() => onQueryChange({ page: pagination.page - 1 })}
+              aria-label="Página anterior de clientes"
+              className="min-h-12 min-w-12 px-3 rounded-xl border border-white/10 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 flex items-center justify-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Anterior</span>
+            </button>
+            <button
+              type="button"
+              disabled={pagination.page >= totalPages}
+              onClick={() => onQueryChange({ page: pagination.page + 1 })}
+              aria-label="Página siguiente de clientes"
+              className="min-h-12 min-w-12 px-3 rounded-xl border border-white/10 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 flex items-center justify-center gap-1"
+            >
+              <span className="hidden sm:inline">Siguiente</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
