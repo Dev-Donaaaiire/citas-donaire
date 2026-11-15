@@ -1,10 +1,12 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
 import { checkProductionLicenseGate } from '@/lib/license'
 import {
+  DEMO_SANDBOX_COOKIE_NAME,
   DEMO_SANDBOX_SERVICES,
   DEMO_SANDBOX_SETTINGS,
   getDemoSandboxBusyIntervals,
@@ -31,9 +33,23 @@ export interface PublicBookingInitialData {
   needsSetup: boolean
 }
 
+const resolveSandboxDelta = async (explicitCookie?: string | null) => {
+  if (typeof explicitCookie === 'string') return explicitCookie
+  try {
+    const cookieStore = await cookies()
+    return cookieStore.get(DEMO_SANDBOX_COOKIE_NAME)?.value || null
+  } catch {
+    return null
+  }
+}
+
 const fetchPublicBookingInitialData = cache(
-  async (isDemoRoute: boolean): Promise<PublicBookingInitialData> => {
+  async (
+    isDemoRoute: boolean,
+    explicitDeltaCookie?: string | null
+  ): Promise<PublicBookingInitialData> => {
     const canUseAdmin = hasSupabaseAdminConfig()
+    const deltaCookie = await resolveSandboxDelta(explicitDeltaCookie)
 
   try {
     let settings: BusinessPublicSettings | null = null
@@ -106,7 +122,7 @@ const fetchPublicBookingInitialData = cache(
       return {
         services: DEMO_SANDBOX_SERVICES,
         settings: DEMO_SANDBOX_SETTINGS,
-        busyIntervals: getDemoSandboxBusyIntervals(),
+        busyIntervals: getDemoSandboxBusyIntervals(deltaCookie),
         isSandboxFallback: true,
         licenseBlocked: false,
         licenseMessage: null,
@@ -119,7 +135,7 @@ const fetchPublicBookingInitialData = cache(
         return {
           services: DEMO_SANDBOX_SERVICES,
           settings: DEMO_SANDBOX_SETTINGS,
-          busyIntervals: getDemoSandboxBusyIntervals(),
+          busyIntervals: getDemoSandboxBusyIntervals(deltaCookie),
           isSandboxFallback: true,
           licenseBlocked: false,
           licenseMessage: null,
@@ -236,7 +252,7 @@ const fetchPublicBookingInitialData = cache(
       return {
         services: DEMO_SANDBOX_SERVICES,
         settings: DEMO_SANDBOX_SETTINGS,
-        busyIntervals: getDemoSandboxBusyIntervals(),
+        busyIntervals: getDemoSandboxBusyIntervals(deltaCookie),
         isSandboxFallback: true,
         licenseBlocked: false,
         licenseMessage: null,
@@ -264,6 +280,10 @@ const fetchPublicBookingInitialData = cache(
 
 export async function getPublicBookingInitialData(options?: {
   isDemoRoute?: boolean
+  sandboxDeltaCookie?: string | null
 }): Promise<PublicBookingInitialData> {
-  return fetchPublicBookingInitialData(Boolean(options?.isDemoRoute))
+  return fetchPublicBookingInitialData(
+    Boolean(options?.isDemoRoute),
+    options?.sandboxDeltaCookie || null
+  )
 }

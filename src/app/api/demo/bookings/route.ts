@@ -1,4 +1,3 @@
-import crypto from 'node:crypto'
 import { after, NextRequest, NextResponse } from 'next/server'
 import {
   BookingApiError,
@@ -14,6 +13,8 @@ import {
 } from '@/lib/booking-request'
 import { isDbDemoModeActive } from '@/lib/demo-guard'
 import {
+  addDemoSandboxBooking,
+  DEMO_SANDBOX_COOKIE_NAME,
   DEMO_SANDBOX_SERVICES,
   DEMO_SANDBOX_SETTINGS,
 } from '@/lib/demo-sandbox'
@@ -51,16 +52,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result, { status: 201 })
     }
 
-    // Modo producción: devolvemos respuesta sandbox aislada sin tocar BD real
+    // Modo producción / sandbox aislado: persistimos la reserva en el delta del sandbox
     const bodyStr = (value: unknown) =>
       typeof value === 'string' ? value : ''
     const nombre = bodyStr(body.nombre).trim()
     const email = bodyStr(body.email).trim().toLowerCase()
     const telefono = bodyStr(body.telefono).trim()
     const slotDatetime = bodyStr(body.slotDatetime).trim()
-    const service =
-      DEMO_SANDBOX_SERVICES.find((s) => s.id === body.serviceId) ||
-      DEMO_SANDBOX_SERVICES[0]
 
     const startDate = new Date(slotDatetime)
     if (
@@ -75,30 +73,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const endDate = new Date(
-      startDate.getTime() + service.duracion_minutos * 60_000
-    )
-    const token = crypto.randomUUID()
-    const id = crypto.randomUUID()
-
-    return NextResponse.json(
+    const deltaCookie = request.cookies.get(DEMO_SANDBOX_COOKIE_NAME)?.value
+    const bookingResult = addDemoSandboxBooking(
       {
-        appointment: {
-          id,
-          client_id: '00000000-0000-0000-0000-00000000c999',
-          service_id: service.id,
-          fecha_hora_inicio: startDate.toISOString(),
-          fecha_hora_fin: endDate.toISOString(),
-          estado: 'confirmada',
-          token_cancelacion: token,
-          notas: bodyStr(body.notas).trim() || null,
-          created_at: new Date().toISOString(),
-          service,
-        },
-        service,
+        serviceId: typeof body.serviceId === 'string' ? body.serviceId : undefined,
+        nombre,
+        email,
+        telefono,
+        notas: bodyStr(body.notas).trim() || null,
+        slotDatetime,
+      },
+      deltaCookie
+    )
+
+    const response = NextResponse.json(
+      {
+        appointment: bookingResult.appointment,
+        service: bookingResult.service,
         client: {
-          id: '00000000-0000-0000-0000-00000000c999',
-          nombre,
+          id: bookingResult.client.id,
+          nombre: bookingResult.client.nombre,
         },
         businessSettings: DEMO_SANDBOX_SETTINGS,
         rescheduled: false,
@@ -112,6 +106,15 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     )
+
+    response.cookies.set(DEMO_SANDBOX_COOKIE_NAME, bookingResult.serializedCookie, {
+      path: '/',
+      httpOnly: false,
+      sameSite: 'lax',
+      maxAge: 86400 * 7,
+    })
+
+    return response
   } catch (err) {
     if (err instanceof BookingApiError) {
       return NextResponse.json(

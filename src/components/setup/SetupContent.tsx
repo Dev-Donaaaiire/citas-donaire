@@ -109,7 +109,9 @@ export function SetupContent({
     initialSettings?.tema_activo || 'dark_luxury'
   )
   const [modoDemo, setModoDemo] = useState<boolean>(
-    initialSettings?.modo_demo ?? false
+    initialSettings?.modo_demo !== undefined
+      ? Boolean(initialSettings.modo_demo)
+      : true
   )
   const [services, setServices] = useState<EditableService[]>(
     initialSetupData.services.length > 0

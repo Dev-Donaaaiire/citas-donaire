@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isDbDemoModeActive } from '@/lib/demo-guard'
 import { updateAppointmentStatusServer } from '@/lib/data/admin-dashboard'
+import {
+  DEMO_SANDBOX_COOKIE_NAME,
+  updateDemoSandboxAppointmentStatus,
+} from '@/lib/demo-sandbox'
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -31,10 +35,30 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (!(await isDbDemoModeActive())) {
-      return NextResponse.json({
+      const deltaCookie = request.cookies.get(DEMO_SANDBOX_COOKIE_NAME)?.value
+      const updateResult = updateDemoSandboxAppointmentStatus(
+        appointmentId,
+        estado as 'confirmada' | 'cancelada' | 'completada' | 'no_show',
+        deltaCookie
+      )
+
+      const response = NextResponse.json({
         success: true,
         sandbox: true,
       })
+
+      response.cookies.set(
+        DEMO_SANDBOX_COOKIE_NAME,
+        updateResult.serializedCookie,
+        {
+          path: '/',
+          httpOnly: false,
+          sameSite: 'lax',
+          maxAge: 86400 * 7,
+        }
+      )
+
+      return response
     }
 
     const result = await updateAppointmentStatusServer(

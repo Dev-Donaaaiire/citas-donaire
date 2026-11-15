@@ -1,8 +1,12 @@
 import React, { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 import { connection } from 'next/server'
 import { Loader2 } from 'lucide-react'
 import { ReservarContent } from '@/components/booking/ReservarContent'
 import { getPublicBookingInitialData } from '@/lib/data/public-booking'
+
+const showSalesLanding =
+  process.env.NEXT_PUBLIC_SHOW_SALES_LANDING?.trim().toLowerCase() === 'true'
 
 interface DemoClientPageProps {
   searchParams: Promise<{
@@ -12,6 +16,10 @@ interface DemoClientPageProps {
 }
 
 async function DemoReservarLoader({ searchParams }: DemoClientPageProps) {
+  if (!showSalesLanding) {
+    redirect('/')
+  }
+
   await connection()
   const resolved = await searchParams
   const rescheduleToken =

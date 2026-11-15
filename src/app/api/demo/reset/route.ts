@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server'
 import { isDbDemoModeActive } from '@/lib/demo-guard'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { DEMO_SANDBOX_COOKIE_NAME } from '@/lib/demo-sandbox'
 
 export async function POST() {
   try {
     if (!(await isDbDemoModeActive())) {
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         sandbox: true,
         message: 'Entorno sandbox reiniciado sin tocar datos de producción.',
       })
+      response.cookies.set(DEMO_SANDBOX_COOKIE_NAME, '', {
+        path: '/',
+        maxAge: 0,
+      })
+      return response
     }
 
     const db = getSupabaseAdmin()

@@ -1,11 +1,15 @@
 import 'server-only'
 
+import { cookies } from 'next/headers'
 import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
 import {
   checkProductionLicenseGate,
   type LicenseVerificationResult,
 } from '@/lib/license'
-import { getDemoSandboxAdminDataset } from '@/lib/demo-sandbox'
+import {
+  DEMO_SANDBOX_COOKIE_NAME,
+  getDemoSandboxAdminDataset,
+} from '@/lib/demo-sandbox'
 import type {
   Appointment,
   BlockedSlot,
@@ -99,6 +103,7 @@ export async function getAdminDashboardData(options?: {
   clientFilter?: 'all' | 'risk' | 'blocked'
   clientSearch?: string | null
   demoRoute?: boolean
+  sandboxDeltaCookie?: string | null
 }): Promise<AdminDashboardPayload> {
   const demoRoute = Boolean(options?.demoRoute)
   const page = Math.max(1, Number(options?.clientPage || 1))
@@ -118,8 +123,21 @@ export async function getAdminDashboardData(options?: {
     message: 'Entorno sandbox aislado de demostración.',
   }
 
+  const resolveSandboxDelta = async () => {
+    if (typeof options?.sandboxDeltaCookie === 'string') {
+      return options.sandboxDeltaCookie
+    }
+    try {
+      const cookieStore = await cookies()
+      return cookieStore.get(DEMO_SANDBOX_COOKIE_NAME)?.value || null
+    } catch {
+      return null
+    }
+  }
+
   if (!hasSupabaseAdminConfig()) {
-    const sandbox = getDemoSandboxAdminDataset()
+    const deltaCookie = await resolveSandboxDelta()
+    const sandbox = getDemoSandboxAdminDataset(deltaCookie)
     return {
       settings: {
         ...sandbox.settings,
@@ -166,7 +184,8 @@ export async function getAdminDashboardData(options?: {
   // Si es /demo/admin y la BD está en modo producción real (modo_demo = false),
   // jamás leemos datos de clientes reales ni permitimos mutaciones sobre BD real.
   if (demoRoute && settingsRow && !settingsRow.modo_demo) {
-    const sandbox = getDemoSandboxAdminDataset()
+    const deltaCookie = await resolveSandboxDelta()
+    const sandbox = getDemoSandboxAdminDataset(deltaCookie)
     return {
       settings: {
         ...sandbox.settings,

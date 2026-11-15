@@ -19,11 +19,11 @@ export function buildVercelOneClickDeployUrl(repoUrl?: string): string {
   const targetRepo = (repoUrl || DEFAULT_REPO_URL).trim()
   const params = new URLSearchParams({
     'repository-url': targetRepo,
-    env: 'NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY',
+    env: 'NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY',
     envDescription:
-      'Configura tu Supabase, claves administrativas, Resend y tu clave LICENSE_KEY',
-    'project-name': 'krono-citas',
-    'repository-name': 'krono-citas',
+      'Configura tu base de datos Supabase, clave de administrador, Resend y tu clave LICENSE_KEY para activar tu sistema de citas.',
+    'project-name': 'agenda-citas',
+    'repository-name': 'agenda-citas',
   })
   return `https://vercel.com/new/clone?${params.toString()}`
 }

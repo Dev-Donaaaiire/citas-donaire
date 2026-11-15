@@ -1,0 +1,59 @@
+LICENCIA PROPIETARIA COMERCIAL Y DE PROTECCIÓN CONTRA EL PLAGIO
+PROPRIETARY SOURCE-AVAILABLE & ANTI-PLAGIARISM COMMERCIAL LICENSE
+
+Copyright (C) 2026-2027 Alvaro. Todos los derechos reservados.
+Titular y Autor: Alvaro (NIF: [eliminado])
+Contacto Legal: [correo eliminado]
+Software: Krono / Donaire Citas
+
+==============================================================================
+AVISO LEGAL CRITICO - NO ES SOFTWARE DE CODIGO ABIERTO (NOT OPEN SOURCE)
+==============================================================================
+
+ATENCION: La disponibilidad publica de este codigo fuente en plataformas como
+GitHub se realiza UNICAMENTE para permitir el despliegue tecnico automatizado
+(Vercel One-Click Deploy) y la verificacion por parte de compradores que hayan
+adquirido una licencia comercial legalmente emitida.
+
+Este software NO esta licenciado bajo MIT, Apache, GPL, BSD ni ninguna otra
+licencia de software libre o de codigo abierto. El acceso al repositorio NO
+confiere derechos de propiedad, copia, distribucion ni comercializacion a terceros.
+
+==============================================================================
+TERMINOS Y CONDICIONES DE LA LICENCIA
+==============================================================================
+
+1. PROHIBICION ABSOLUTA DE PLAGIO, COPIA Y REVENTA
+Queda terminantemente prohibido a cualquier persona fisica o juridica, sin
+autorizacion previa, expresa y por escrito de Alvaro:
+
+a) Vender, revender, alquilar, sublicenciar, distribuir, monetizar o explotar
+   comercialmente este software, total o parcialmente, como producto, plantilla,
+   paquete de software o servicio SaaS.
+b) Plagiar, copiar o rebrandear el diseno, codigo, arquitectura o estructura
+   para publicarlo o comercializarlo bajo otra marca (Marca Blanca / White-Labeling).
+c) Alojar o republicar copias o forks de este repositorio con fines publicos o
+   comerciales.
+
+2. DERECHO DE USO CONCEDIDO AL COMPRADOR AUTORIZADO
+La adquisicion legal de una clave de licencia comercial oficial (LICENSE_KEY)
+otorgada por Alvaro confiere unicamente un derecho no exclusivo,
+intransferible y limitado para ejecutar el software en UNA (1) SOLA INSTANCIA
+de negocio para la gestion de citas de su propio establecimiento comercial.
+
+3. PROTECCION DE MEDIDAS TECNOLOGICAS
+Queda terminantemente prohibido manipular, alterar, parchear o eludir los
+mecanismos de validacion de licencias (src/lib/license.ts), firmas criptograficas
+HMAC o tokens implementados en el software.
+
+4. ACCIONES LEGALES Y JURISDICCION
+Este software esta protegido por el Real Decreto Legislativo 1/1996 de la Ley
+de Propiedad Intelectual en Espana, la Directiva 2009/24/CE de la Union Europea
+y los Tratados Internacionales de la OMPI / Convenio de Berna.
+
+Cualquier infraccion dara lugar al ejercicio inmediato de acciones civiles por
+danos, perjuicios y lucro cesante, acciones penales (arts. 270 y ss. del Codigo
+Penal) y notificaciones de cese DMCA ante Vercel, GitHub y proveedores de hosting.
+Jurisdiccion aplicable: Juzgados y Tribunales competentes.
+
+Contacto legal y comercial: [correo eliminado]
