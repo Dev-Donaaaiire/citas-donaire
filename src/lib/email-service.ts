@@ -505,6 +505,40 @@ export async function sendBookingConfirmationEmails(
 
   if (errors.length === results.length) {
     if (errors.every(isResendSandboxOrDomainError)) {
+      const fallbackJobs = [
+        resend.emails.send({
+          from: 'Krono Citas <onboarding@resend.dev>',
+          to: input.clientEmail,
+          subject: `Confirmación de tu cita · ${input.businessName}`,
+          html: clientHtml,
+          attachments: [icsAttachment],
+        }),
+      ]
+      if (ownerEmail) {
+        fallbackJobs.push(
+          resend.emails.send({
+            from: 'Krono Citas <onboarding@resend.dev>',
+            to: ownerEmail,
+            subject: `¡Nueva cita reservada! · ${input.clientName} (${input.serviceName})`,
+            html: ownerHtml,
+            attachments: [icsAttachment],
+          })
+        )
+      }
+      const fallbackResults = await Promise.allSettled(fallbackJobs)
+      const hasAnySuccess = fallbackResults.some(
+        (r) => r.status === 'fulfilled' && !r.value.error
+      )
+      if (hasAnySuccess) {
+        return {
+          success: true,
+          simulated: false,
+          googleCalendarUrl,
+          cancelUrl,
+          icsFilename,
+        }
+      }
+
       console.warn(
         'Resend en modo sandbox o dominio sin verificar; degradando notificación de reserva a modo simulado:',
         errors.join(' | ')
@@ -755,12 +789,25 @@ export async function sendLicenseDeliveryEmail(input: {
     }
   }
 
-  const { data, error } = await resend.emails.send({
+  let { data, error } = await resend.emails.send({
     from: DEFAULT_FROM,
     to: input.buyerEmail,
     subject: `🔑 Tu Licencia Krono (${input.licenseKey}) + Despliegue en 1 Clic`,
     html,
   })
+
+  if (error && isResendSandboxOrDomainError(error.message)) {
+    const fallbackSend = await resend.emails.send({
+      from: 'Krono Citas <onboarding@resend.dev>',
+      to: input.buyerEmail,
+      subject: `🔑 Tu Licencia Krono (${input.licenseKey}) + Despliegue en 1 Clic`,
+      html,
+    })
+    if (!fallbackSend.error) {
+      data = fallbackSend.data
+      error = null
+    }
+  }
 
   if (error) {
     if (isResendSandboxOrDomainError(error.message)) {
