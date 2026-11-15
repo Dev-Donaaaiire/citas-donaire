@@ -154,11 +154,11 @@ export function LegalCheckoutModal({ plan, onClose }: Props) {
                 className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 text-sm font-semibold text-zinc-950 shadow-[0_0_20px_rgb(var(--glow-rgb)/0.25)] transition-all hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Lock className="h-4 w-4" />
-                Aceptar y pagar {plan.priceLabel} con Stripe
+                Aceptar y pagar {plan.priceLabel} con PayPal
               </button>
               {!checkoutReady && (
                 <p className="text-center text-[11px] text-amber-400">
-                  Enlace de pago no configurado: define NEXT_PUBLIC_CHECKOUT_URL_15 / _99 (Stripe Payment Link).
+                  Enlace de pago no configurado: define NEXT_PUBLIC_PAYPAL_URL_15 / _99 (Enlace de PayPal).
                 </p>
               )}
             </div>

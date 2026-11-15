@@ -68,7 +68,7 @@ export const LEGAL_DOCS: LegalDoc[] = [
         paragraphs: [
           'El Software se entrega «tal cual» (as-is), en el estado mostrado en la Demo Interactiva en Vivo, sin garantías adicionales de adecuación a un fin particular distintas de las legalmente irrenunciables.',
           'Cualquier soporte, asistencia o corrección queda anulado si el Comprador o un tercero modifica el código fuente, la estructura de la base de datos o la configuración original. El soporte, cuando proceda, se limita a la puesta en marcha del Software sin modificar.',
-          'El funcionamiento depende de servicios de terceros contratados por el Comprador (Supabase, Vercel, Resend, Stripe u otros). El Proveedor no responde de sus cambios, cortes, límites de uso o tarifas.',
+          'El funcionamiento depende de servicios de terceros contratados por el Comprador (Supabase, Vercel, Resend, PayPal u otros). El Proveedor no responde de sus cambios, cortes, límites de uso o tarifas.',
         ],
       },
       {
@@ -146,13 +146,13 @@ export const LEGAL_DOCS: LegalDoc[] = [
         paragraphs: [
           'Compra: email, nombre y datos de facturación para gestionar el pedido, emitir la licencia y enviártela por correo (ejecución del contrato, art. 6.1.b RGPD) y cumplir obligaciones fiscales y contables (art. 6.1.c).',
           'Soporte y comunicaciones sobre tu licencia: atención de consultas (art. 6.1.b y 6.1.f). No enviamos comunicaciones comerciales sin tu consentimiento.',
-          'Datos de pago: se procesan íntegramente por Stripe; el Proveedor no almacena números de tarjeta.',
+          'Datos de pago: se procesan íntegramente por PayPal; el Proveedor no almacena números de tarjeta ni datos bancarios.',
         ],
       },
       {
         heading: '3. Destinatarios y encargados',
         paragraphs: [
-          'Proveedores que acceden a datos para prestar el servicio: Stripe (pagos), Resend (envío de correo), Supabase (base de datos) y Vercel (alojamiento). Pueden implicar transferencias internacionales amparadas en cláusulas contractuales tipo o en el Marco de Privacidad de Datos UE-EE. UU. No cedemos datos a terceros salvo obligación legal.',
+          'Proveedores que acceden a datos para prestar el servicio: PayPal (pagos), Resend (envío de correo), Supabase (base de datos) y Vercel (alojamiento). Pueden implicar transferencias internacionales amparadas en cláusulas contractuales tipo o en el Marco de Privacidad de Datos UE-EE. UU. No cedemos datos a terceros salvo obligación legal.',
         ],
       },
       {

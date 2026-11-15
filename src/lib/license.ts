@@ -328,11 +328,11 @@ export async function verifyLicenseServer(options?: {
 }
 
 /**
- * Crea o recupera (idempotente por stripe_session_id) una licencia en Supabase maestro
+ * Crea o recupera (idempotente por id de pago de PayPal o Stripe) una licencia en Supabase maestro
  */
-export async function issueOrGetLicenseForStripeSession(params: {
+export async function issueOrGetLicenseForPaymentSession(params: {
   compradorEmail: string
-  stripeSessionId: string
+  paymentSessionId: string
   plan: LicensePlan
 }) {
   const masterClient = getMasterSupabase()
@@ -342,12 +342,12 @@ export async function issueOrGetLicenseForStripeSession(params: {
     )
   }
 
-  // Idempotencia: comprobar si esta sesión de Stripe ya generó una clave
-  if (params.stripeSessionId) {
+  // Idempotencia: comprobar si esta sesión de pago ya generó una clave
+  if (params.paymentSessionId) {
     const { data: existing } = await masterClient
       .from('licenses')
       .select('*')
-      .eq('stripe_session_id', params.stripeSessionId)
+      .eq('stripe_session_id', params.paymentSessionId)
       .maybeSingle()
 
     if (existing) {
@@ -367,7 +367,7 @@ export async function issueOrGetLicenseForStripeSession(params: {
       .insert({
         license_key: licenseKey,
         comprador_email: params.compradorEmail.trim().toLowerCase(),
-        stripe_session_id: params.stripeSessionId,
+        stripe_session_id: params.paymentSessionId,
         plan: params.plan,
         activa: true,
       })
@@ -387,4 +387,19 @@ export async function issueOrGetLicenseForStripeSession(params: {
   throw new Error(
     `No se pudo registrar la licencia en Supabase tras varios intentos: ${lastError}`
   )
+}
+
+/**
+ * Alias de compatibilidad para sesiones de pago
+ */
+export async function issueOrGetLicenseForStripeSession(params: {
+  compradorEmail: string
+  stripeSessionId: string
+  plan: LicensePlan
+}) {
+  return issueOrGetLicenseForPaymentSession({
+    compradorEmail: params.compradorEmail,
+    paymentSessionId: params.stripeSessionId,
+    plan: params.plan,
+  })
 }
