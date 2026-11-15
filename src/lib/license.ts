@@ -127,8 +127,16 @@ export async function verifyLicenseServer(options?: {
   const cleanDomain = normalizeDomain(options?.domain)
   const isLocalHost = isLocalHostname(cleanDomain)
 
-  // 1. Si la instancia del comprador apunta a un API remoto del vendedor
-  const remoteApiUrl = process.env.LICENSE_VERIFY_API_URL?.trim()
+  // 1. Identificar si somos el servidor maestro o una instancia cliente del comprador
+  const isMasterServer =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('bsxnxzhbvwtsgwkvwqoc') ||
+    Boolean(process.env.MASTER_SUPABASE_SERVICE_ROLE_KEY?.trim())
+
+  const remoteApiUrl = (
+    process.env.LICENSE_VERIFY_API_URL ||
+    (!isMasterServer ? 'https://citas-donaire.vercel.app/api/license/verify' : '')
+  ).trim()
+
   if (remoteApiUrl && !options?.skipRemoteApi && rawKey) {
     try {
       const headers: Record<string, string> = {
@@ -303,8 +311,16 @@ export async function verifyLicenseServer(options?: {
     licenseRow.license_key.startsWith('DONAIRE-DEMO')
   let authorizedDomain = normalizeDomain(licenseRow.dominio_autorizado)
 
+  const isVercelDomain = (d: string | null) =>
+    Boolean(d && (d.endsWith('.vercel.app') || d.endsWith('.now.sh')))
+
   if (!isDemoKey && cleanDomain && !isLocalHost) {
-    if (!authorizedDomain || authorizedDomain === 'localhost') {
+    const canBindOrUpgrade =
+      !authorizedDomain ||
+      authorizedDomain === 'localhost' ||
+      (isVercelDomain(authorizedDomain) && !isVercelDomain(cleanDomain))
+
+    if (canBindOrUpgrade) {
       if (options?.allowDomainBind) {
         const { error: updateErr } = await masterClient
           .from('licenses')

@@ -6,6 +6,19 @@ import {
 } from '@/lib/license'
 import { getAdminSessionStatus } from '@/lib/admin-auth'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-license-verify-secret',
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  })
+}
+
 export async function GET() {
   try {
     const session = await getAdminSessionStatus()
@@ -30,54 +43,52 @@ export async function GET() {
     // 200 si la licencia es válida (o demo); 403 si está inactiva, ausente o no coincide el dominio
     return NextResponse.json(safePayload, {
       status: result.valid || result.status === 'demo' ? 200 : 403,
+      headers: corsHeaders,
     })
   } catch (err) {
     console.error('[api/license/verify][GET] Error:', err)
     return NextResponse.json(
       { error: 'No se pudo comprobar el estado de la licencia.' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     )
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getAdminSessionStatus()
-    const verifySecret = process.env.LICENSE_VERIFY_SECRET?.trim()
-    const providedSecret = request.headers.get('x-license-verify-secret')?.trim()
-    const hasSecretAccess = Boolean(
-      verifySecret && providedSecret && verifySecret === providedSecret
-    )
-
-    if (!session.authenticated && !hasSecretAccess) {
-      return NextResponse.json(
-        { error: 'No autorizado para validar o vincular licencias.' },
-        { status: 401 }
-      )
-    }
-
     const body = (await request.json().catch(() => ({}))) as {
       licenseKey?: string
       domain?: string
       bindDomain?: boolean
     }
 
+    if (!body.licenseKey) {
+      return NextResponse.json(
+        { error: 'Debes proporcionar una clave de licencia (licenseKey).' },
+        { status: 400, headers: corsHeaders }
+      )
+    }
+
+    // Validación pública contra la base de datos maestra de Álvaro
     const result = await verifyLicenseServer({
-      keyOverride: body.licenseKey || null,
-      domain: body.domain || resolveTrustedDeploymentDomain(),
-      allowDomainBind: Boolean(body.bindDomain && (session.authenticated || hasSecretAccess)),
+      keyOverride: body.licenseKey,
+      domain: body.domain || null,
+      allowDomainBind: Boolean(body.bindDomain),
       skipRemoteApi: true,
     })
 
-    return NextResponse.json({
-      ...result,
-      licenseKey: maskLicenseKey(result.licenseKey),
-    })
+    return NextResponse.json(
+      {
+        ...result,
+        licenseKey: maskLicenseKey(result.licenseKey),
+      },
+      { headers: corsHeaders }
+    )
   } catch (err) {
     console.error('[api/license/verify][POST] Error:', err)
     return NextResponse.json(
       { error: 'Error al validar la licencia.' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     )
   }
 }
