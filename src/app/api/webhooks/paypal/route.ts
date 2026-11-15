@@ -102,6 +102,10 @@ async function verifyPayPalWebhookSignature(
   const transmissionSig = request.headers.get('paypal-transmission-sig')?.trim()
   const transmissionTime = request.headers.get('paypal-transmission-time')?.trim()
 
+  const isSandbox =
+    process.env.PAYPAL_ENV?.trim().toLowerCase() === 'sandbox' ||
+    process.env.NODE_ENV !== 'production'
+
   if (
     !authAlgo ||
     !certUrl ||
@@ -109,9 +113,9 @@ async function verifyPayPalWebhookSignature(
     !transmissionSig ||
     !transmissionTime
   ) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (isSandbox) {
       console.warn(
-        '[webhooks/paypal] Modo desarrollo/test: omitiendo verificación de cabeceras de firma ausentes.'
+        '[webhooks/paypal] Modo sandbox/test: omitiendo verificación de cabeceras de firma ausentes.'
       )
       return { valid: true, status: 400 }
     }
