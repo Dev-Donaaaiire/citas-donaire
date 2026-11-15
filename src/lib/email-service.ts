@@ -633,7 +633,7 @@ export function buildLicenseDeliveryEmailHtml(params: {
 }
 
 /**
- * Envía al instante el email de entrega tras completarse el checkout en Stripe.
+ * Envía al instante el email de entrega tras completarse el pago en PayPal o Stripe.
  */
 export async function sendLicenseDeliveryEmail(input: {
   buyerEmail: string

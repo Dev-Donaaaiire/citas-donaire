@@ -52,7 +52,9 @@ O en formato HTML para correos electrónicos:
 | `LICENSE_KEY` | Sí | Clave de licencia `DONAIRE-XXXX-XXXX-2027` |
 | `RESEND_FROM_EMAIL` | Opcional | Remitente verificado en Resend |
 | `OWNER_NOTIFICATION_EMAIL` | Opcional | Email de respaldo del dueño |
-| `STRIPE_WEBHOOK_SECRET` | Vendedor | Secreto `whsec_...` para validar el webhook de Stripe |
+| `PAYPAL_WEBHOOK_ID` | Vendedor | ID del webhook de PayPal en Developer Dashboard (opcional si se usa verificación estándar) |
+| `NEXT_PUBLIC_PAYPAL_URL_15` | Vendedor | Enlace de pago directo / Botón de PayPal para el plan de 14,99 € |
+| `NEXT_PUBLIC_PAYPAL_URL_99` | Vendedor | Enlace de pago directo / Botón de PayPal para el plan de 99,00 € |
 | `MASTER_SUPABASE_URL` / `MASTER_SUPABASE_ANON_KEY` | Opcional | Supabase maestro para validar licencias desde instalaciones externas |
 | `LICENSE_VERIFY_API_URL` | Opcional | Endpoint remoto (`/api/license/verify`) en el dominio principal |
 
@@ -62,10 +64,11 @@ O en formato HTML para correos electrónicos:
 
 - **Validador de Licencias (`/api/license/verify` y `src/lib/license.ts`)**:
   - Comprueba `process.env.LICENSE_KEY` en el servidor contra la tabla `public.licenses` del Supabase maestro (o mediante endpoint remoto en `LICENSE_VERIFY_API_URL`).
-- **Webhook Automático de Stripe (`/api/webhooks/stripe`)**:
-  - Escucha el evento `checkout.session.completed` verificando la cabecera `stripe-signature` con `STRIPE_WEBHOOK_SECRET`.
+- **Webhook Automático de PayPal (`/api/webhooks/paypal`)**:
+  - Escucha eventos de pago de PayPal (`PAYMENT.CAPTURE.COMPLETED`, `CHECKOUT.ORDER.APPROVED`, `PAYMENT.SALE.COMPLETED`).
   - Detecta automáticamente si el pago corresponde al plan de **14,99 €** (`autoinstalable_15`) o al de **99 €** (`llave_en_mano_99`).
   - Genera una licencia criptográfica única `DONAIRE-XXXX-XXXX-2027`, la guarda de forma idempotente en `public.licenses` y envía al instante un email HTML vía Resend con la clave, el enlace al vídeo tutorial de 5 minutos y el botón de despliegue automático en Vercel.
+  - Además, se mantiene compatibilidad con `/api/webhooks/stripe` para transiciones si fuera necesario.
 
 ---
 

@@ -275,7 +275,7 @@ export function LandingPage() {
                 Un pago. Tu sistema para siempre.
               </h2>
               <p className="text-sm text-zinc-400 sm:text-base">
-                Elige cómo lo quieres. Pago seguro con Stripe.
+                Elige cómo lo quieres. Pago seguro con PayPal.
               </p>
             </motion.div>
 
