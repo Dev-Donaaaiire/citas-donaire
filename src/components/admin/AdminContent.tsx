@@ -12,6 +12,7 @@ import { AdminHeader } from '@/components/admin/AdminHeader'
 import { AdminMetricsGrid } from '@/components/admin/AdminMetricsGrid'
 import { AdminAgendaView } from '@/components/admin/AdminAgendaView'
 import { AdminClientRetentionTable } from '@/components/admin/AdminClientRetentionTable'
+import { AdminUpdateBanner } from '@/components/admin/AdminUpdateBanner'
 import { FeedbackProvider } from '@/components/ui/FeedbackProvider'
 import { cn } from '@/lib/utils'
 
@@ -136,6 +137,9 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
             </Link>
           </div>
         )}
+
+        {/* Banner de actualización de versión (si hay novedades en el repo maestro) */}
+        <AdminUpdateBanner />
 
         {/* Métricas ejecutivas */}
         <AdminMetricsGrid metrics={metrics} />
