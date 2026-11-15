@@ -236,9 +236,12 @@ export function AdminHeader({
                 </button>
               )}
             </div>
-            <p className="text-[11px] text-zinc-400 font-mono truncate">
-              Gestión de Agenda &amp; Retención · {settings?.timezone || 'Europe/Madrid'}
-            </p>
+            <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-mono truncate">
+              <span>Gestión de Agenda &amp; Retención · {settings?.timezone || 'Europe/Madrid'}</span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                v1.2.1
+              </span>
+            </div>
           </div>
         </div>
 

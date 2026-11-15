@@ -1,4 +1,4 @@
-export const CURRENT_SYSTEM_VERSION = '1.2.0'
+export const CURRENT_SYSTEM_VERSION = '1.2.1'
 export const UPSTREAM_GITHUB_REPO = 'Dev-Donaaaiire/citas-donaire'
 export const DEFAULT_VERSION_API_URL =
   process.env.VERSION_API_URL ||
@@ -33,7 +33,7 @@ export function compareSemver(v1: string, v2: string): number {
 }
 
 let cachedVersionInfo: { timestamp: number; data: SystemVersionInfo } | null = null
-const CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutos
+const CACHE_TTL_MS = 60 * 1000 // 1 minuto para comprobación ágil
 
 export async function checkSystemUpdate(options?: {
   forceFresh?: boolean
