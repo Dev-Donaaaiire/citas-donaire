@@ -3,24 +3,25 @@ import {
   generateBookingCalendarAssets,
   type BookingCalendarInput,
 } from '@/lib/ics'
+import { sanitizeTimeZone } from '@/lib/timezone'
 
 const DEFAULT_FROM =
-  process.env.RESEND_FROM_EMAIL || 'Krono / Donaire Citas <onboarding@resend.dev>'
+  process.env.RESEND_FROM_EMAIL || 'Krono Citas <onboarding@resend.dev>'
 
 export const DEFAULT_REPO_URL =
-  process.env.NEXT_PUBLIC_REPO_URL?.trim() || 'https://github.com/donaire/krono-citas'
+  process.env.NEXT_PUBLIC_REPO_URL?.trim() ||
+  'https://github.com/Dev-Donaaaiire/citas-donaire'
 
 export const DEFAULT_TUTORIAL_VIDEO_URL =
-  process.env.NEXT_PUBLIC_TUTORIAL_VIDEO_URL?.trim() ||
-  'https://www.youtube.com/watch?v=krono-donaire-setup-5min'
+  process.env.NEXT_PUBLIC_TUTORIAL_VIDEO_URL?.trim() || null
 
 export function buildVercelOneClickDeployUrl(repoUrl?: string): string {
   const targetRepo = (repoUrl || DEFAULT_REPO_URL).trim()
   const params = new URLSearchParams({
     'repository-url': targetRepo,
-    env: 'NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,RESEND_API_KEY,LICENSE_KEY',
+    env: 'NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY',
     envDescription:
-      'Configura tu Supabase, Resend y tu clave LICENSE_KEY de Donaire',
+      'Configura tu Supabase, claves administrativas, Resend y tu clave LICENSE_KEY',
     'project-name': 'krono-citas',
     'repository-name': 'krono-citas',
   })
@@ -33,6 +34,12 @@ function getResendClient(): Resend | null {
     return null
   }
   return new Resend(apiKey)
+}
+
+function isResendSandboxOrDomainError(message: string): boolean {
+  return /only send testing emails|verify a domain|domain is not verified|testing emails to your own/i.test(
+    message
+  )
 }
 
 function escapeHtml(text: string): string {
@@ -53,27 +60,27 @@ function formatPriceEur(amount: number): string {
   }).format(amount)
 }
 
-function formatDateSpanish(iso: string): string {
+function formatDateSpanish(iso: string, timeZone?: string | null): string {
   try {
     return new Date(iso).toLocaleDateString('es-ES', {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
-      timeZone: 'Europe/Madrid',
+      timeZone: sanitizeTimeZone(timeZone),
     })
   } catch {
     return iso
   }
 }
 
-function formatTimeSpanish(iso: string): string {
+function formatTimeSpanish(iso: string, timeZone?: string | null): string {
   try {
     return new Date(iso).toLocaleTimeString('es-ES', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-      timeZone: 'Europe/Madrid',
+      timeZone: sanitizeTimeZone(timeZone),
     })
   } catch {
     return '--:--'
@@ -152,11 +159,12 @@ export function buildOwnerBookingEmailHtml(params: {
   notes?: string | null
   startIso: string
   endIso: string
+  timezone?: string | null
   googleCalendarUrl: string
   adminUrl: string
 }): string {
-  const dateLabel = formatDateSpanish(params.startIso)
-  const timeRange = `${formatTimeSpanish(params.startIso)} - ${formatTimeSpanish(params.endIso)}`
+  const dateLabel = formatDateSpanish(params.startIso, params.timezone)
+  const timeRange = `${formatTimeSpanish(params.startIso, params.timezone)} - ${formatTimeSpanish(params.endIso, params.timezone)}`
   const priceLabel = formatPriceEur(params.servicePrice)
 
   const bodyHtml = `
@@ -256,6 +264,9 @@ export function buildOwnerBookingEmailHtml(params: {
 
 export function buildClientBookingEmailHtml(params: {
   businessName: string
+  businessAddress?: string | null
+  businessPhone?: string | null
+  timezone?: string | null
   serviceName: string
   servicePrice: number
   durationMinutes: number
@@ -265,9 +276,11 @@ export function buildClientBookingEmailHtml(params: {
   googleCalendarUrl: string
   cancelUrl: string
 }): string {
-  const dateLabel = formatDateSpanish(params.startIso)
-  const timeRange = `${formatTimeSpanish(params.startIso)} - ${formatTimeSpanish(params.endIso)}`
+  const dateLabel = formatDateSpanish(params.startIso, params.timezone)
+  const timeRange = `${formatTimeSpanish(params.startIso, params.timezone)} - ${formatTimeSpanish(params.endIso, params.timezone)}`
   const priceLabel = formatPriceEur(params.servicePrice)
+  const cleanAddress = params.businessAddress?.trim()
+  const cleanPhone = params.businessPhone?.trim()
 
   const bodyHtml = `
     <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#d4d4d8;">
@@ -292,12 +305,24 @@ export function buildClientBookingEmailHtml(params: {
             </tr>
             <tr>
               <td style="padding:4px 0;color:#a1a1aa;">Precio</td>
-              <td style="padding:4px 0;color:#ffffff;font-weight:600;">${escapeHtml(priceLabel)} · Pago en salón</td>
+              <td style="padding:4px 0;color:#ffffff;font-weight:600;">${escapeHtml(priceLabel)} · En el establecimiento</td>
             </tr>
-            <tr>
+            ${
+              cleanAddress
+                ? `<tr>
               <td style="padding:4px 0;color:#a1a1aa;">Ubicación</td>
-              <td style="padding:4px 0;color:#e4e4e7;">Calle Serrano 45, Madrid</td>
-            </tr>
+              <td style="padding:4px 0;color:#e4e4e7;">${escapeHtml(cleanAddress)}</td>
+            </tr>`
+                : ''
+            }
+            ${
+              cleanPhone
+                ? `<tr>
+              <td style="padding:4px 0;color:#a1a1aa;">Contacto</td>
+              <td style="padding:4px 0;color:#e4e4e7;">${escapeHtml(cleanPhone)}</td>
+            </tr>`
+                : ''
+            }
           </table>
         </td>
       </tr>
@@ -327,7 +352,7 @@ export function buildClientBookingEmailHtml(params: {
   `
 
   return renderEmailShell({
-    preheader: `Cita confirmada: ${params.serviceName} el ${dateLabel} a las ${formatTimeSpanish(params.startIso)}.`,
+    preheader: `Cita confirmada: ${params.serviceName} el ${dateLabel} a las ${formatTimeSpanish(params.startIso, params.timezone)}.`,
     badge: 'Reserva Confirmada',
     title: '¡Tu cita está confirmada!',
     subtitle: `${params.businessName} · Te esperamos`,
@@ -384,6 +409,7 @@ export function buildClientReminderEmailHtml(params: {
 export async function sendBookingConfirmationEmails(
   input: BookingCalendarInput & {
     ownerEmail?: string | null
+    businessPhone?: string | null
     notes?: string | null
   }
 ) {
@@ -393,8 +419,8 @@ export async function sendBookingConfirmationEmails(
   const cleanBaseUrl = input.baseUrl.replace(/\/$/, '')
   const ownerEmail =
     input.ownerEmail?.trim() ||
-    process.env.OWNER_NOTIFICATION_EMAIL ||
-    'reservas@donairecitas.pro'
+    process.env.OWNER_NOTIFICATION_EMAIL?.trim() ||
+    ''
 
   const ownerHtml = buildOwnerBookingEmailHtml({
     businessName: input.businessName,
@@ -407,12 +433,16 @@ export async function sendBookingConfirmationEmails(
     notes: input.notes,
     startIso: input.startIso,
     endIso: input.endIso,
+    timezone: input.businessTimezone,
     googleCalendarUrl,
     adminUrl: `${cleanBaseUrl}/admin`,
   })
 
   const clientHtml = buildClientBookingEmailHtml({
     businessName: input.businessName,
+    businessAddress: input.businessAddress,
+    businessPhone: input.businessPhone,
+    timezone: input.businessTimezone,
     serviceName: input.serviceName,
     servicePrice: input.servicePrice,
     durationMinutes: input.durationMinutes,
@@ -441,14 +471,7 @@ export async function sendBookingConfirmationEmails(
     contentType: 'text/calendar; charset=utf-8; method=REQUEST',
   }
 
-  const results = await Promise.allSettled([
-    resend.emails.send({
-      from: DEFAULT_FROM,
-      to: ownerEmail,
-      subject: `¡Nueva cita reservada! · ${input.clientName} (${input.serviceName})`,
-      html: ownerHtml,
-      attachments: [icsAttachment],
-    }),
+  const emailJobs = [
     resend.emails.send({
       from: DEFAULT_FROM,
       to: input.clientEmail,
@@ -456,7 +479,21 @@ export async function sendBookingConfirmationEmails(
       html: clientHtml,
       attachments: [icsAttachment],
     }),
-  ])
+  ]
+
+  if (ownerEmail) {
+    emailJobs.push(
+      resend.emails.send({
+        from: DEFAULT_FROM,
+        to: ownerEmail,
+        subject: `¡Nueva cita reservada! · ${input.clientName} (${input.serviceName})`,
+        html: ownerHtml,
+        attachments: [icsAttachment],
+      })
+    )
+  }
+
+  const results = await Promise.allSettled(emailJobs)
 
   const errors = results
     .map((r) => {
@@ -464,9 +501,24 @@ export async function sendBookingConfirmationEmails(
       if (r.value.error) return r.value.error.message
       return null
     })
-    .filter(Boolean)
+    .filter((e): e is string => Boolean(e))
 
   if (errors.length === results.length) {
+    if (errors.every(isResendSandboxOrDomainError)) {
+      console.warn(
+        'Resend en modo sandbox o dominio sin verificar; degradando notificación de reserva a modo simulado:',
+        errors.join(' | ')
+      )
+      return {
+        success: true,
+        simulated: true,
+        reason: 'resend_domain_unverified',
+        googleCalendarUrl,
+        cancelUrl,
+        icsFilename,
+        warnings: errors,
+      }
+    }
     throw new Error(`No se pudieron enviar los correos con Resend: ${errors.join(' | ')}`)
   }
 
@@ -488,6 +540,7 @@ export async function sendClientReminderEmail(input: {
   clientEmail: string
   businessName: string
   lastVisit?: string | null
+  timezone?: string | null
   baseUrl: string
 }) {
   const cleanBaseUrl = input.baseUrl.replace(/\/$/, '')
@@ -500,7 +553,7 @@ export async function sendClientReminderEmail(input: {
       Math.floor((Date.now() - new Date(input.lastVisit).getTime()) / 86_400_000)
     )
     if (days > 0) {
-      lastVisitFormatted = `hace ${days} días (${formatDateSpanish(input.lastVisit)})`
+      lastVisitFormatted = `hace ${days} días (${formatDateSpanish(input.lastVisit, input.timezone)})`
     }
   }
 
@@ -529,6 +582,18 @@ export async function sendClientReminderEmail(input: {
   })
 
   if (error) {
+    if (isResendSandboxOrDomainError(error.message)) {
+      console.warn(
+        'Resend en modo sandbox o dominio sin verificar; degradando recordatorio a modo simulado:',
+        error.message
+      )
+      return {
+        success: true,
+        simulated: true,
+        reason: 'resend_domain_unverified',
+        bookingUrl,
+      }
+    }
     throw new Error(`Error al enviar el recordatorio con Resend: ${error.message}`)
   }
 
@@ -545,7 +610,7 @@ export function buildLicenseDeliveryEmailHtml(params: {
   licenseKey: string
   plan: 'autoinstalable_15' | 'llave_en_mano_99'
   amountFormatted: string
-  tutorialVideoUrl: string
+  tutorialVideoUrl?: string | null
   vercelDeployUrl: string
   setupGuideUrl: string
 }): string {
@@ -590,13 +655,17 @@ export function buildLicenseDeliveryEmailHtml(params: {
           </a>
         </td>
       </tr>
-      <tr>
+      ${
+        params.tutorialVideoUrl
+          ? `<tr>
         <td align="center" style="padding-bottom:10px;">
           <a href="${escapeHtml(params.tutorialVideoUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;box-sizing:border-box;text-align:center;padding:13px 20px;border-radius:10px;background-color:#18181b;border:1px solid #3f3f46;color:#f4f4f5;font-size:13px;font-weight:600;text-decoration:none;">
             🎬 Ver Vídeo Tutorial de Instalación (5 min)
           </a>
         </td>
-      </tr>
+      </tr>`
+          : ''
+      }
       <tr>
         <td align="center">
           <a href="${escapeHtml(params.setupGuideUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;box-sizing:border-box;text-align:center;padding:11px 20px;border-radius:10px;background-color:transparent;border:1px solid #27272a;color:#a1a1aa;font-size:12px;font-weight:600;text-decoration:none;">
@@ -626,14 +695,16 @@ export function buildLicenseDeliveryEmailHtml(params: {
     preheader: `Tu licencia ${params.licenseKey} y despliegue en 1 clic de Krono / Donaire Citas están listos.`,
     badge: 'Compra Confirmada · Entrega Inmediata',
     title: 'Tu sistema de citas ya es tuyo',
-    subtitle: 'Clave de licencia, vídeo tutorial de 5 min y despliegue automático',
+    subtitle: params.tutorialVideoUrl
+      ? 'Clave de licencia, vídeo tutorial de 5 min y despliegue automático'
+      : 'Clave de licencia y despliegue automático en 1 clic',
     bodyHtml,
     footerNote: `Licencia emitida para ${params.buyerEmail} · Krono / Donaire Citas`,
   })
 }
 
 /**
- * Envía al instante el email de entrega tras completarse el pago en PayPal o Stripe.
+ * Envía al instante el email de entrega tras completarse el pago en PayPal.
  */
 export async function sendLicenseDeliveryEmail(input: {
   buyerEmail: string
@@ -692,6 +763,22 @@ export async function sendLicenseDeliveryEmail(input: {
   })
 
   if (error) {
+    if (isResendSandboxOrDomainError(error.message)) {
+      console.warn(
+        'Resend en modo sandbox o dominio sin verificar; degradando entrega de licencia a modo simulado:',
+        error.message
+      )
+      return {
+        success: true,
+        simulated: true,
+        reason: 'resend_domain_unverified',
+        to: input.buyerEmail,
+        licenseKey: input.licenseKey,
+        vercelDeployUrl,
+        tutorialVideoUrl,
+        setupGuideUrl,
+      }
+    }
     throw new Error(
       `No se pudo enviar el correo de licencia con Resend: ${error.message}`
     )

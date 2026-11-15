@@ -8,56 +8,53 @@ import { formatCurrency, formatDateShort } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 interface BookingSummaryBarProps {
-  currentStep: number
-  selectedService: Service | null
-  selectedDate: Date
+  step: 1 | 2
+  service: Service | null
+  selectedDate: Date | null
   selectedSlot: TimeSlot | null
   onContinue: () => void
   disabled?: boolean
+  timeZone?: string
 }
 
 export function BookingSummaryBar({
-  currentStep,
-  selectedService,
+  step,
+  service,
   selectedDate,
   selectedSlot,
   onContinue,
   disabled,
+  timeZone,
 }: BookingSummaryBarProps) {
-  if (currentStep >= 3) {
-    // En el paso 3 (formulario) y 4 (confirmación) el botón principal está en el propio componente
-    return null
-  }
-
   const canContinue =
-    (currentStep === 1 && selectedService !== null) ||
-    (currentStep === 2 && selectedSlot !== null)
+    (step === 1 && service !== null) || (step === 2 && selectedSlot !== null)
 
-  const getButtonText = () => {
-    if (currentStep === 1) return 'Elegir Fecha y Hora'
-    if (currentStep === 2) return 'Continuar con mis Datos'
-    return 'Continuar'
-  }
+  const buttonText =
+    step === 1
+      ? 'Elegir fecha y hora'
+      : step === 2
+        ? 'Continuar con mis datos'
+        : 'Continuar'
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-zinc-950/80 backdrop-blur-xl border-t border-white/10 shadow-[0_-8px_32px_rgba(0,0,0,0.5)]">
+    <div className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-zinc-950/90 backdrop-blur-xl border-t border-white/10 shadow-[0_-8px_32px_rgba(0,0,0,0.5)]">
       <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
-        {/* Info resumen */}
         <div className="min-w-0 flex-1">
-          {selectedService ? (
+          {service ? (
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-white truncate">
-                {selectedService.nombre}
+              <span className="text-xs sm:text-sm font-semibold text-white truncate">
+                {service.nombre}
               </span>
               <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
                 <span className="text-emerald-400 font-bold">
-                  {formatCurrency(Number(selectedService.precio))}
+                  {formatCurrency(Number(service.precio))}
                 </span>
-                {selectedSlot && (
+                {selectedSlot && selectedDate && (
                   <>
-                    <span>•</span>
-                    <span className="text-zinc-300">
-                      {formatDateShort(selectedDate)} a las {selectedSlot.time}
+                    <span aria-hidden="true">·</span>
+                    <span className="text-zinc-300 truncate">
+                      {formatDateShort(selectedDate, timeZone)} a las{' '}
+                      {selectedSlot.time} h
                     </span>
                   </>
                 )}
@@ -65,27 +62,26 @@ export function BookingSummaryBar({
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Selecciona un servicio para comenzar</span>
             </div>
           )}
         </div>
 
-        {/* Botón CTA táctil */}
         <motion.button
           type="button"
-          whileTap={{ scale: canContinue ? 0.97 : 1 }}
+          whileTap={{ scale: canContinue ? 0.98 : 1 }}
           onClick={onContinue}
           disabled={!canContinue || disabled}
           className={cn(
-            'h-12 min-h-[48px] px-5 sm:px-6 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer select-none shrink-0',
+            'min-h-12 h-12 px-5 sm:px-6 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer select-none shrink-0 active:scale-[0.98]',
             canContinue
               ? 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400 shadow-[0_0_20px_rgb(var(--glow-rgb)/0.35)]'
-              : 'bg-zinc-800 text-zinc-500 border border-white/5 cursor-not-allowed opacity-60'
+              : 'ui-slot-disabled border cursor-not-allowed'
           )}
         >
-          <span>{getButtonText()}</span>
-          <ArrowRight className="w-4 h-4" />
+          <span>{buttonText}</span>
+          <ArrowRight className="w-4 h-4 shrink-0" />
         </motion.button>
       </div>
     </div>

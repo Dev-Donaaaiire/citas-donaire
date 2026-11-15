@@ -40,8 +40,8 @@ html[data-theme="dark_luxury"] {
   --color-zinc-100: #f1ece0;
   --color-zinc-200: #ddd7c8;
   --color-zinc-300: #c2bba9;
-  --color-zinc-400: #9a9484;
-  --color-zinc-500: #77725f;
+  --color-zinc-400: #a29c8b;
+  --color-zinc-500: #8b8571;
   --color-zinc-600: #54503f;
   --color-zinc-700: #38352c;
   --color-zinc-800: #221f1b;
@@ -97,8 +97,8 @@ html[data-theme="clean_minimal"] {
   --color-zinc-100: #1c1b19;
   --color-zinc-200: #34322e;
   --color-zinc-300: #4f4c46;
-  --color-zinc-400: #6d6a63;
-  --color-zinc-500: #7d7971;
+  --color-zinc-400: #57544e;
+  --color-zinc-500: #68645d;
   --color-zinc-600: #c6c3bc;
   --color-zinc-700: #dedcd7;
   --color-zinc-800: #ecebe8;
@@ -180,7 +180,7 @@ html[data-theme="neon_creator"] {
   --color-zinc-200: #d6deea;
   --color-zinc-300: #b6c3d8;
   --color-zinc-400: #8fa0bb;
-  --color-zinc-500: #5f6f8c;
+  --color-zinc-500: #7888a6;
   --color-zinc-600: #3b4860;
   --color-zinc-700: #232d42;
   --color-zinc-800: #151d2d;
@@ -216,11 +216,9 @@ html[data-theme="neon_creator"] h3 {
   letter-spacing: -0.03em;
 }
 
+/* Fondo monocromático limpio (sin gradientes radiales) */
 html[data-theme="neon_creator"] body {
-  background-image:
-    radial-gradient(48rem 26rem at 8% -8%, rgb(0 217 245 / 0.1), transparent 65%),
-    radial-gradient(42rem 26rem at 100% 0%, rgb(16 224 138 / 0.07), transparent 65%);
-  background-attachment: fixed;
+  background-color: var(--color-zinc-950);
 }
 
 /* Glassmorphism más profundo + micro-interacciones rápidas */
@@ -236,8 +234,87 @@ html[data-theme="neon_creator"] input,
 html[data-theme="neon_creator"] textarea {
   transition-duration: 90ms;
 }
+/* Hover refinado: realce de borde, sin alterar el brillo del texto */
 html[data-theme="neon_creator"] button:not(:disabled):hover {
-  filter: brightness(1.12);
+  border-color: rgb(var(--glow-rgb) / 0.45);
+}
+
+/* --------------------------------------------------------------------------
+   Tokens semánticos accesibles multi-tema (WCAG AA >= 4.5:1 en los 3 temas)
+   -------------------------------------------------------------------------- */
+:root,
+html[data-theme="dark_luxury"] {
+  --slot-disabled-bg: rgba(19, 18, 20, 0.65);
+  --slot-disabled-text: #8b8571;
+  --slot-disabled-border: rgba(246, 240, 225, 0.08);
+  --danger-solid-bg: #b91c1c;
+  --danger-solid-hover: #991b1b;
+  --danger-solid-text: #ffffff;
+  --danger-soft-bg: rgba(127, 29, 29, 0.35);
+  --danger-soft-text: #fecaca;
+  --danger-soft-border: rgba(248, 113, 113, 0.4);
+  --contrast-btn-bg: #f6f0e1;
+  --contrast-btn-hover: #e5ddc7;
+  --contrast-btn-text: #09090b;
+}
+
+html[data-theme="clean_minimal"] {
+  --slot-disabled-bg: #efede9;
+  --slot-disabled-text: #787570;
+  --slot-disabled-border: rgba(17, 17, 16, 0.1);
+  --danger-solid-bg: #b91c1c;
+  --danger-solid-hover: #991b1b;
+  --danger-solid-text: #ffffff;
+  --danger-soft-bg: #fef2f2;
+  --danger-soft-text: #991b1b;
+  --danger-soft-border: #fca5a5;
+  --contrast-btn-bg: #111110;
+  --contrast-btn-hover: #292724;
+  --contrast-btn-text: #f7f6f4;
+}
+
+html[data-theme="neon_creator"] {
+  --slot-disabled-bg: rgba(11, 17, 28, 0.65);
+  --slot-disabled-text: #64748b;
+  --slot-disabled-border: rgba(255, 255, 255, 0.08);
+  --danger-solid-bg: #b91c1c;
+  --danger-solid-hover: #991b1b;
+  --danger-solid-text: #ffffff;
+  --danger-soft-bg: rgba(127, 29, 29, 0.4);
+  --danger-soft-text: #fecaca;
+  --danger-soft-border: rgba(248, 113, 113, 0.45);
+  --contrast-btn-bg: #ffffff;
+  --contrast-btn-hover: #eaf0f7;
+  --contrast-btn-text: #05070d;
+}
+
+.ui-slot-disabled {
+  background-color: var(--slot-disabled-bg);
+  color: var(--slot-disabled-text);
+  border-color: var(--slot-disabled-border);
+}
+
+.ui-btn-danger {
+  background-color: var(--danger-solid-bg);
+  color: var(--danger-solid-text);
+  border-color: transparent;
+}
+.ui-btn-danger:hover:not(:disabled) {
+  background-color: var(--danger-solid-hover);
+}
+
+.ui-badge-danger {
+  background-color: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+  border-color: var(--danger-soft-border);
+}
+
+.ui-btn-contrast {
+  background-color: var(--contrast-btn-bg);
+  color: var(--contrast-btn-text);
+}
+.ui-btn-contrast:hover:not(:disabled) {
+  background-color: var(--contrast-btn-hover);
 }
 
 /* --------------------------------------------------------------------------

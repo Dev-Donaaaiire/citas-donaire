@@ -1,8 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { LegalDocument } from '@/components/legal/LegalDocument'
-import { LEGAL_DOCS, LEGAL_LAST_UPDATE } from '@/lib/legal'
+import {
+  LEGAL_DOCS,
+  LEGAL_LAST_UPDATE,
+  getMissingLegalFields,
+} from '@/lib/legal'
 
 export const metadata: Metadata = {
   title: 'Información legal · Krono / Donaire Citas',
@@ -11,6 +15,8 @@ export const metadata: Metadata = {
 }
 
 export default function LegalPage() {
+  const missingLegalFields = getMissingLegalFields()
+
   return (
     <div className="min-h-dvh bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-zinc-950/85 backdrop-blur-xl">
@@ -41,10 +47,30 @@ export default function LegalPage() {
           <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
             Información legal
           </h1>
-          <p className="font-mono text-xs text-zinc-500">
+          <p className="font-mono text-xs text-zinc-400">
             Última actualización: {LEGAL_LAST_UPDATE}
           </p>
         </div>
+
+        {missingLegalFields.length > 0 && (
+          <div
+            role="alert"
+            className="space-y-2 rounded-2xl border border-amber-500/35 bg-amber-950/30 p-4 text-xs leading-relaxed text-amber-200"
+          >
+            <div className="flex items-center gap-2 font-semibold text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Aviso de configuración (solo visible hasta completarla)</span>
+            </div>
+            <p>
+              Faltan datos legales del titular. Define estas variables de entorno
+              antes de publicar; los marcadores entre corchetes del texto
+              inferior son provisionales y no son datos reales:
+            </p>
+            <p className="font-mono text-amber-100">
+              {missingLegalFields.join(' · ')}
+            </p>
+          </div>
+        )}
         {LEGAL_DOCS.map((doc) => (
           <LegalDocument key={doc.id} doc={doc} />
         ))}

@@ -16,21 +16,23 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
-          estado: 'confirmada' | 'cancelada' | 'completada'
+          estado: 'confirmada' | 'cancelada' | 'completada' | 'no_show'
           fecha_hora_fin: string
           fecha_hora_inicio: string
           id: string
+          notas: string | null
           service_id: string
           token_cancelacion: string
-          updated_at: string
+          updated_at?: string
         }
         Insert: {
           client_id: string
           created_at?: string
-          estado?: 'confirmada' | 'cancelada' | 'completada'
+          estado?: 'confirmada' | 'cancelada' | 'completada' | 'no_show'
           fecha_hora_fin: string
           fecha_hora_inicio: string
           id?: string
+          notas?: string | null
           service_id: string
           token_cancelacion?: string
           updated_at?: string
@@ -38,10 +40,11 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
-          estado?: 'confirmada' | 'cancelada' | 'completada'
+          estado?: 'confirmada' | 'cancelada' | 'completada' | 'no_show'
           fecha_hora_fin?: string
           fecha_hora_inicio?: string
           id?: string
+          notas?: string | null
           service_id?: string
           token_cancelacion?: string
           updated_at?: string
@@ -70,7 +73,7 @@ export type Database = {
           fecha_inicio: string
           id: string
           motivo: string | null
-          updated_at: string
+          updated_at?: string
         }
         Insert: {
           created_at?: string
@@ -94,6 +97,7 @@ export type Database = {
         Row: {
           created_at: string
           dias_laborables: Json
+          direccion: string | null
           duracion_cita_minutos: number
           email_notificaciones: string | null
           horario_apertura: string
@@ -102,13 +106,16 @@ export type Database = {
           logo_url: string | null
           modo_demo: boolean
           nombre_negocio: string
+          telefono_contacto: string | null
           tema_activo: 'dark_luxury' | 'clean_minimal' | 'neon_creator'
+          timezone: string
           ultima_restauracion_demo: string | null
-          updated_at: string
+          updated_at?: string
         }
         Insert: {
           created_at?: string
           dias_laborables?: Json
+          direccion?: string | null
           duracion_cita_minutos?: number
           email_notificaciones?: string | null
           horario_apertura?: string
@@ -117,13 +124,16 @@ export type Database = {
           logo_url?: string | null
           modo_demo?: boolean
           nombre_negocio?: string
+          telefono_contacto?: string | null
           tema_activo?: 'dark_luxury' | 'clean_minimal' | 'neon_creator'
+          timezone?: string
           ultima_restauracion_demo?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           dias_laborables?: Json
+          direccion?: string | null
           duracion_cita_minutos?: number
           email_notificaciones?: string | null
           horario_apertura?: string
@@ -132,7 +142,9 @@ export type Database = {
           logo_url?: string | null
           modo_demo?: boolean
           nombre_negocio?: string
+          telefono_contacto?: string | null
           tema_activo?: 'dark_luxury' | 'clean_minimal' | 'neon_creator'
+          timezone?: string
           ultima_restauracion_demo?: string | null
           updated_at?: string
         }
@@ -144,18 +156,20 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          no_shows: number
           nombre: string
-          notas: string | null
+          notas?: string | null
           telefono: string | null
           total_citas: number
           ultima_visita: string | null
-          updated_at: string
+          updated_at?: string
         }
         Insert: {
           bloqueado_no_show?: boolean
           created_at?: string
           email: string
           id?: string
+          no_shows?: number
           nombre: string
           notas?: string | null
           telefono?: string | null
@@ -168,6 +182,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          no_shows?: number
           nombre?: string
           notas?: string | null
           telefono?: string | null
@@ -183,12 +198,12 @@ export type Database = {
           comprador_email: string
           created_at: string
           dominio_autorizado: string | null
-          fecha_creacion: string
+          fecha_creacion?: string
           id: string
           license_key: string
           plan: 'autoinstalable_15' | 'llave_en_mano_99'
-          stripe_session_id: string | null
-          updated_at: string
+          stripe_session_id?: string | null
+          updated_at?: string
         }
         Insert: {
           activa?: boolean
@@ -220,12 +235,13 @@ export type Database = {
         Row: {
           activo: boolean
           created_at: string
-          descripcion: string | null
+          descripcion?: string | null
           duracion_minutos: number
           id: string
           nombre: string
+          orden: number
           precio: number
-          updated_at: string
+          updated_at?: string
         }
         Insert: {
           activo?: boolean
@@ -234,6 +250,7 @@ export type Database = {
           duracion_minutos?: number
           id?: string
           nombre: string
+          orden?: number
           precio?: number
           updated_at?: string
         }
@@ -244,6 +261,7 @@ export type Database = {
           duracion_minutos?: number
           id?: string
           nombre?: string
+          orden?: number
           precio?: number
           updated_at?: string
         }
@@ -254,6 +272,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_appointment_by_token: { Args: { p_token: string }; Returns: Json }
+      consume_rate_limit: {
+        Args: {
+          p_key: string
+          p_max_requests: number
+          p_window_seconds: number
+        }
+        Returns: Json
+      }
+      increment_client_appointments: {
+        Args: { p_client_id: string; p_delta: number }
+        Returns: number
+      }
+      record_client_no_show: { Args: { p_client_id: string }; Returns: Json }
+      get_appointment_by_cancel_token: { Args: { p_token: string }; Returns: Json }
+      get_public_business_settings: {
+        Args: Record<string, never>
+        Returns: {
+          dias_laborables: Json
+          direccion: string | null
+          duracion_cita_minutos: number
+          horario_apertura: string
+          horario_cierre: string
+          id: string
+          logo_url: string | null
+          modo_demo: boolean
+          nombre_negocio: string
+          telefono_contacto: string | null
+          tema_activo: string
+          timezone: string
+        }[]
+      }
+      get_public_busy_intervals: {
+        Args: { p_from: string; p_to: string }
+        Returns: { fin: string; inicio: string; kind: string }[]
+      }
       reset_demo_data: { Args: { force?: boolean }; Returns: Json }
     }
     Enums: {

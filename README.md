@@ -1,83 +1,48 @@
-# Krono / Donaire Citas — Sistema Élite de Reservas, Retención y Temas en Vivo
+# Krono / Donaire Citas · Sistema de Reservas Profesional para Negocios
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdonaire%2Fkrono-citas&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,RESEND_API_KEY,LICENSE_KEY&envDescription=Introduce%20tus%20credenciales%20de%20Supabase%2C%20Resend%20y%20tu%20clave%20LICENSE_KEY&project-name=krono-citas&repository-name=krono-citas)
-
-Plataforma profesional de gestión de citas sin llamadas, diseñada con Next.js (App Router), TypeScript, Tailwind CSS, Framer Motion, Resend (`.ics` + emails automáticos) y Supabase.
+Plataforma Next.js 16 (App Router, `proxy.ts`, Server Components, React 19, Tailwind v4) y Supabase con RLS estricto, prevención física de reservas duplicadas mediante índice `btree_gist`, notificaciones por email con archivo `.ics`, autenticación HMAC administrativa y multi-tema adaptativo (`dark_luxury`, `clean_minimal`, `neon_creator`).
 
 ---
 
-## Despliegue en 1 Clic para Compradores (Deploy with Vercel)
+## Despliegue en 1 clic (Vercel)
 
-Código oficial listo para incrustar en tu página de ventas o correos de bienvenida (sustituye `https%3A%2F%2Fgithub.com%2Fdonaire%2Fkrono-citas` por la URL de tu repositorio si usas otro slug):
-
-```markdown
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdonaire%2Fkrono-citas&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,RESEND_API_KEY,LICENSE_KEY&envDescription=Introduce%20tus%20credenciales%20de%20Supabase%2C%20Resend%20y%20tu%20clave%20LICENSE_KEY&project-name=krono-citas&repository-name=krono-citas)
-```
-
-O en formato HTML para correos electrónicos:
-
-```html
-<a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdonaire%2Fkrono-citas&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,RESEND_API_KEY,LICENSE_KEY&envDescription=Introduce%20tus%20credenciales%20de%20Supabase%2C%20Resend%20y%20tu%20clave%20LICENSE_KEY&project-name=krono-citas&repository-name=krono-citas">
-  <img src="https://vercel.com/button" alt="Deploy with Vercel" />
-</a>
-```
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDev-Donaaaiire%2Fcitas-donaire&env=NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY&envDescription=Introduce%20tus%20credenciales%20de%20Supabase%2C%20clave%20de%20administrador%2C%20Resend%20y%20tu%20LICENSE_KEY&project-name=krono-citas&repository-name=krono-citas)
 
 ---
 
-## Guía Rápida de Instalación (5 minutos)
+## Puesta en marcha rápida
 
-1. **Pulsa el botón "Deploy with Vercel"** superior. Vercel clonará el proyecto en tu cuenta de GitHub y te pedirá las 4 variables obligatorias:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `RESEND_API_KEY`
-   - `LICENSE_KEY` (tu clave con formato `DONAIRE-XXXX-XXXX-2027`)
-2. **Abre `/setup` tras el despliegue**:
-   - Entra en `https://tu-web.vercel.app/setup`.
-   - El asistente detectará si tu proyecto de Supabase está vacío y te dará un botón de **Copiar Script SQL Inicial** para pegarlo en el **SQL Editor** de Supabase en 1 clic.
-   - Configura desde la interfaz gráfica el nombre de tu negocio, estética (`Dark Luxury`, `Clean Minimal` o `Neon Creator`), horarios y catálogo de servicios.
-3. **Empieza a recibir reservas**:
-   - Vista pública para clientes (Instagram bio): `/reservar`
-   - Panel de control del dueño + Seguimiento (+30 días): `/admin`
-   - Demo interactiva con barra de temas en vivo: `/demo`
-
----
-
-## Variables de Entorno (`.env.example`)
-
-| Variable | Obligatoria | Descripción |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Sí | URL de tu proyecto Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Sí | Anon Public Key de Supabase |
-| `RESEND_API_KEY` | Sí | API Key de [Resend](https://resend.com) para enviar correos y `.ics` |
-| `LICENSE_KEY` | Sí | Clave de licencia `DONAIRE-XXXX-XXXX-2027` |
-| `RESEND_FROM_EMAIL` | Opcional | Remitente verificado en Resend |
-| `OWNER_NOTIFICATION_EMAIL` | Opcional | Email de respaldo del dueño |
-| `PAYPAL_WEBHOOK_ID` | Vendedor | ID del webhook de PayPal en Developer Dashboard (opcional si se usa verificación estándar) |
-| `NEXT_PUBLIC_PAYPAL_URL_15` | Vendedor | Enlace de pago directo / Botón de PayPal para el plan de 14,99 € |
-| `NEXT_PUBLIC_PAYPAL_URL_99` | Vendedor | Enlace de pago directo / Botón de PayPal para el plan de 99,00 € |
-| `MASTER_SUPABASE_URL` / `MASTER_SUPABASE_ANON_KEY` | Opcional | Supabase maestro para validar licencias desde instalaciones externas |
-| `LICENSE_VERIFY_API_URL` | Opcional | Endpoint remoto (`/api/license/verify`) en el dominio principal |
+1. **Clonar e instalar dependencias**:
+   ```bash
+   git clone https://github.com/Dev-Donaaaiire/citas-donaire.git
+   cd citas-donaire
+   npm install
+   ```
+2. **Configurar variables de entorno**:
+   Copia `.env.example` a `.env.local` y rellena:
+   - `NEXT_PUBLIC_APP_URL`
+   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`
+   - `ADMIN_PASSWORD` (mínimo 10 caracteres) y `ADMIN_SESSION_SECRET` (mínimo 16 caracteres, obligatorio en producción)
+   - `RESEND_API_KEY` y `RESEND_FROM_EMAIL` (verifica tu dominio en Resend para envíos a clientes externos)
+   - `LICENSE_KEY` (desbloquea producción cuando `modo_demo = false`)
+3. **Aplicar migraciones SQL en Supabase**:
+   Ejecuta las migraciones de `supabase/migrations/` en orden (incluyendo `20261115000000_security_hardening_rls_constraints_rpc.sql` y `20261115010000_rate_limit_and_atomic_counters.sql`) o utiliza el bloque SQL completo sincronizado disponible dentro de `/setup` o en `src/lib/initial-sql.ts`.
+4. **Verificar en local**:
+   ```bash
+   npm run dev
+   ```
 
 ---
 
-## Automatización Comercial "Entregar y Olvidar"
+## Flujo recomendado para compradores
 
-- **Validador de Licencias (`/api/license/verify` y `src/lib/license.ts`)**:
-  - Comprueba `process.env.LICENSE_KEY` en el servidor contra la tabla `public.licenses` del Supabase maestro (o mediante endpoint remoto en `LICENSE_VERIFY_API_URL`).
-- **Webhook Automático de PayPal (`/api/webhooks/paypal`)**:
-  - Escucha eventos de pago de PayPal (`PAYMENT.CAPTURE.COMPLETED`, `CHECKOUT.ORDER.APPROVED`, `PAYMENT.SALE.COMPLETED`).
-  - Detecta automáticamente si el pago corresponde al plan de **14,99 €** (`autoinstalable_15`) o al de **99 €** (`llave_en_mano_99`).
-  - Genera una licencia criptográfica única `DONAIRE-XXXX-XXXX-2027`, la guarda de forma idempotente en `public.licenses` y envía al instante un email HTML vía Resend con la clave, el enlace al vídeo tutorial de 5 minutos y el botón de despliegue automático en Vercel.
-  - Además, se mantiene compatibilidad con `/api/webhooks/stripe` para transiciones si fuera necesario.
+1. Accede a `/setup` tras iniciar sesión en `/admin/login`.
+2. Revisa el diagnóstico de entorno (`Service Role`, tablas SQL, RLS y licencia).
+3. Configura nombre del negocio, dirección, teléfono, zona horaria (por defecto `Europe/Madrid`), horario, tema visual y catálogo de servicios.
+4. Comparte `/reservar` en tu biografía de Instagram, WhatsApp o Google Maps.
 
----
+## Notas operativas de Seguridad
 
-## Desarrollo Local
-
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
-
-Abre [http://localhost:3000](http://localhost:3000) o [http://localhost:3000/setup](http://localhost:3000/setup).
+- El tráfico anónimo público nunca accede directamente a tablas con datos personales (`clients`, `appointments`, `licenses`): utiliza funciones PostgreSQL `SECURITY DEFINER` mínimas (`get_public_busy_intervals`, `get_appointment_by_cancel_token`, `cancel_appointment_by_token`) y el endpoint `POST /api/bookings`.
+- Las rutas `/admin`, `/setup`, `/api/admin/*` y `/api/notifications/reminder` requieren cookie de sesión `HttpOnly` firmada con HMAC.
+- El webhook de PayPal valida firma criptográfica obligatoria, moneda `EUR` e importe cobrado de forma fail-closed.

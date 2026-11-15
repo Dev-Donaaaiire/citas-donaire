@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import { Calendar, DollarSign, Users, UserX } from 'lucide-react'
+import { Calendar, Euro, Users, UserX } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 
 interface AdminMetricsGridProps {
@@ -30,7 +30,7 @@ export function AdminMetricsGrid({ metrics }: AdminMetricsGridProps) {
       value: metrics.weeklyEstimatedRevenue,
       formatted: formatCurrency(metrics.weeklyEstimatedRevenue),
       subtitle: 'Lunes a Domingo (citas activas)',
-      icon: DollarSign,
+      icon: Euro,
       accentColor: 'text-zinc-100',
       badge: 'Semana',
     },
@@ -68,11 +68,11 @@ export function AdminMetricsGrid({ metrics }: AdminMetricsGridProps) {
             className="p-4 sm:p-5 rounded-2xl bg-zinc-900/50 border border-white/10 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
           >
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider leading-snug min-w-0">
                   {card.title}
                 </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/5">
+                <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-white/5 shrink-0">
                   {card.badge}
                 </span>
               </div>
@@ -87,7 +87,7 @@ export function AdminMetricsGrid({ metrics }: AdminMetricsGridProps) {
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-2">
-              <span className="text-[11px] text-zinc-500 truncate">
+              <span className="text-xs text-zinc-400 truncate">
                 {card.subtitle}
               </span>
               <Icon className="w-4 h-4 text-zinc-500 shrink-0" />

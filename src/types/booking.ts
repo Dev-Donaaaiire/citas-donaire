@@ -3,8 +3,8 @@ import type { Database } from './database.types'
 export type Service = Database['public']['Tables']['services']['Row']
 export type Client = Database['public']['Tables']['clients']['Row']
 export type Appointment = Database['public']['Tables']['appointments']['Row'] & {
-  clients?: Client | null
-  services?: Service | null
+  client?: Client | null
+  service?: Service | null
 }
 export type BlockedSlot = Database['public']['Tables']['blocked_slots']['Row']
 export type BusinessSettings = Database['public']['Tables']['business_settings']['Row']
@@ -29,10 +29,12 @@ export interface DayAvailability {
 export interface BookingSubmission {
   serviceId: string
   slotDatetime: string
-  clientName: string
-  clientEmail: string
-  clientPhone?: string
-  notes?: string
+  nombre: string
+  email: string
+  telefono: string
+  notas?: string
+  /** Honeypot anti-bots (siempre vacío en usuarios reales). */
+  website?: string
 }
 
 export interface BookingConfirmationDetails {
@@ -45,4 +47,35 @@ export interface BookingConfirmationDetails {
   fechaHoraInicio: string
   fechaHoraFin: string
   businessName: string
+  businessAddress?: string | null
+  businessPhone?: string | null
+  businessTimezone?: string | null
+  rescheduled?: boolean
+}
+
+export interface PublicBusyInterval {
+  inicio: string
+  fin: string
+  kind: 'appointment' | 'blocked'
+}
+
+export type BusinessPublicSettings = Omit<
+  BusinessSettings,
+  'email_notificaciones' | 'created_at' | 'updated_at' | 'ultima_restauracion_demo'
+>
+
+export interface CancelAppointmentDetails {
+  id: string
+  estado: 'confirmada' | 'cancelada' | 'completada' | 'no_show'
+  fecha_hora_inicio: string
+  fecha_hora_fin: string
+  service_id: string
+  service_nombre: string
+  service_precio: number
+  service_duracion_minutos: number
+  client_nombre: string
+  business_name: string
+  direccion: string | null
+  telefono_contacto: string | null
+  timezone: string
 }

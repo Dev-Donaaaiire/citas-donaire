@@ -59,7 +59,7 @@ export function DemoTopBar() {
                 title={`${t.label} · ${t.tagline}`}
                 onClick={() => setTheme(t.id)}
                 className={cn(
-                  'relative flex h-10 min-w-10 touch-manipulation select-none items-center justify-center gap-2 rounded-[10px] px-2.5 text-xs font-medium transition-colors active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400',
+                  'relative flex min-h-12 min-w-12 touch-manipulation select-none items-center justify-center gap-2 rounded-[10px] px-3 text-xs font-medium transition-colors active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400',
                   active ? 'text-white' : 'text-zinc-400 hover:text-white'
                 )}
               >
@@ -98,7 +98,7 @@ export function DemoTopBar() {
                 aria-label={v.long}
                 title={v.long}
                 className={cn(
-                  'relative flex h-10 min-w-10 touch-manipulation select-none items-center justify-center gap-1.5 rounded-[10px] px-2.5 text-xs font-medium transition-colors active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400',
+                  'relative flex min-h-12 min-w-12 touch-manipulation select-none items-center justify-center gap-1.5 rounded-[10px] px-3 text-xs font-medium transition-colors active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400',
                   v.active ? 'text-white' : 'text-zinc-400 hover:text-white'
                 )}
               >
@@ -120,7 +120,7 @@ export function DemoTopBar() {
         {/* CTA de compra */}
         <Link
           href="/#precios"
-          className="ml-auto flex h-10 shrink-0 touch-manipulation select-none items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 text-xs font-semibold text-zinc-950 shadow-[0_0_22px_rgba(16,185,129,0.35)] transition-all hover:bg-emerald-400 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 sm:px-4 sm:text-sm"
+          className="ml-auto flex min-h-12 shrink-0 touch-manipulation select-none items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3.5 text-xs font-semibold text-zinc-950 shadow-[0_0_22px_rgb(var(--glow-rgb)/0.35)] transition-all hover:bg-emerald-400 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 sm:px-4 sm:text-sm"
         >
           <ShoppingBag className="h-4 w-4 shrink-0" strokeWidth={1.9} />
           <span className="whitespace-nowrap xl:hidden">

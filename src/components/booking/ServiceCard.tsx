@@ -17,16 +17,17 @@ export function ServiceCard({ service, isSelected, onSelect }: ServiceCardProps)
   return (
     <motion.button
       type="button"
+      aria-pressed={isSelected}
       onClick={() => onSelect(service)}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       className={cn(
-        'group relative w-full text-left p-5 rounded-2xl transition-all duration-200 cursor-pointer select-none',
+        'group relative w-full min-h-[88px] text-left p-5 rounded-2xl transition-all duration-200 cursor-pointer select-none active:scale-[0.98]',
         'border backdrop-blur-md',
         isSelected
           ? 'bg-zinc-900/90 border-emerald-500/60 shadow-[0_0_24px_-4px_rgb(var(--glow-rgb)/0.25)] ring-1 ring-emerald-500/50'
-          : 'bg-zinc-900/40 border-white/10 hover:border-white/20 hover:bg-zinc-900/70'
+          : 'bg-zinc-900/60 border-white/10 hover:border-white/25 hover:bg-zinc-900/80'
       )}
     >
       <div className="flex items-start justify-between gap-4">
@@ -48,7 +49,9 @@ export function ServiceCard({ service, isSelected, onSelect }: ServiceCardProps)
               <Clock className="w-3.5 h-3.5 text-zinc-400" />
               <span>{service.duracion_minutos} min</span>
             </div>
-            <span className="text-zinc-600">•</span>
+            <span aria-hidden="true" className="text-zinc-400">
+              ·
+            </span>
             <span className="text-xs text-zinc-400">Atención personalizada</span>
           </div>
         </div>
@@ -59,11 +62,12 @@ export function ServiceCard({ service, isSelected, onSelect }: ServiceCardProps)
           </div>
 
           <div
+            aria-hidden="true"
             className={cn(
               'w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 mt-2',
               isSelected
                 ? 'bg-emerald-500 text-zinc-950 shadow-sm'
-                : 'border border-white/20 bg-zinc-800/50 text-transparent group-hover:border-white/40'
+                : 'border border-white/25 bg-zinc-800/50 text-transparent group-hover:border-white/45'
             )}
           >
             <Check className="w-3.5 h-3.5 stroke-[2.5]" />

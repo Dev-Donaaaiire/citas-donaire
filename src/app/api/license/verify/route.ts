@@ -1,41 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyLicenseServer } from '@/lib/license'
+import {
+  maskLicenseKey,
+  resolveTrustedDeploymentDomain,
+  verifyLicenseServer,
+} from '@/lib/license'
+import { getAdminSessionStatus } from '@/lib/admin-auth'
 
-function extractDomainFromHeaders(request: NextRequest): string | null {
-  return (
-    request.headers.get('x-forwarded-host') ||
-    request.headers.get('host') ||
-    null
-  )
-}
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const keyParam = request.nextUrl.searchParams.get('key')
-    const domainParam =
-      request.nextUrl.searchParams.get('domain') ||
-      extractDomainFromHeaders(request)
-    const strict = request.nextUrl.searchParams.get('strict') === 'true'
+    const session = await getAdminSessionStatus()
+    const trustedDomain = resolveTrustedDeploymentDomain()
 
+    // Solo lectura: nunca permite vincular dominio arbitrario por query GET pública
     const result = await verifyLicenseServer({
-      licenseKey: keyParam || undefined,
-      domain: domainParam,
-      skipRemoteApi: Boolean(keyParam),
+      domain: trustedDomain,
+      allowDomainBind: false,
     })
 
-    return NextResponse.json(result, {
-      status: strict && !result.valid ? 403 : 200,
+    const safePayload = {
+      ...result,
+      licenseKey: session.authenticated
+        ? result.licenseKey
+        : maskLicenseKey(result.licenseKey),
+      dominioAutorizado: session.authenticated
+        ? result.dominioAutorizado
+        : null,
+    }
+
+    // 200 si la licencia es válida (o demo); 403 si está inactiva, ausente o no coincide el dominio
+    return NextResponse.json(safePayload, {
+      status: result.valid || result.status === 'demo' ? 200 : 403,
     })
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : 'Error verificando licencia.'
+  } catch (err) {
+    console.error('[api/license/verify][GET] Error:', err)
     return NextResponse.json(
-      {
-        valid: false,
-        unlimited: false,
-        status: 'unconfigured',
-        message,
-      },
+      { error: 'No se pudo comprobar el estado de la licencia.' },
       { status: 500 }
     )
   }
@@ -43,33 +42,41 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSessionStatus()
+    const verifySecret = process.env.LICENSE_VERIFY_SECRET?.trim()
+    const providedSecret = request.headers.get('x-license-verify-secret')?.trim()
+    const hasSecretAccess = Boolean(
+      verifySecret && providedSecret && verifySecret === providedSecret
+    )
+
+    if (!session.authenticated && !hasSecretAccess) {
+      return NextResponse.json(
+        { error: 'No autorizado para validar o vincular licencias.' },
+        { status: 401 }
+      )
+    }
+
     const body = (await request.json().catch(() => ({}))) as {
       licenseKey?: string
       domain?: string
-      strict?: boolean
+      bindDomain?: boolean
     }
 
-    const domain = body.domain || extractDomainFromHeaders(request)
-
     const result = await verifyLicenseServer({
-      licenseKey: body.licenseKey,
-      domain,
-      skipRemoteApi: Boolean(body.licenseKey),
+      keyOverride: body.licenseKey || null,
+      domain: body.domain || resolveTrustedDeploymentDomain(),
+      allowDomainBind: Boolean(body.bindDomain && (session.authenticated || hasSecretAccess)),
+      skipRemoteApi: true,
     })
 
-    return NextResponse.json(result, {
-      status: body.strict && !result.valid ? 403 : 200,
+    return NextResponse.json({
+      ...result,
+      licenseKey: maskLicenseKey(result.licenseKey),
     })
-  } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : 'Error verificando licencia.'
+  } catch (err) {
+    console.error('[api/license/verify][POST] Error:', err)
     return NextResponse.json(
-      {
-        valid: false,
-        unlimited: false,
-        status: 'unconfigured',
-        message,
-      },
+      { error: 'Error al validar la licencia.' },
       { status: 500 }
     )
   }

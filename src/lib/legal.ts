@@ -5,14 +5,66 @@
  */
 
 export const LEGAL_OWNER = {
-  name: process.env.NEXT_PUBLIC_LEGAL_NAME || '[NOMBRE Y APELLIDOS / RAZÓN SOCIAL]',
+  name:
+    process.env.NEXT_PUBLIC_LEGAL_NAME ||
+    process.env.NEXT_PUBLIC_LEGAL_TITULAR ||
+    '[NOMBRE Y APELLIDOS / RAZÓN SOCIAL]',
   nif: process.env.NEXT_PUBLIC_LEGAL_NIF || '[NIF/CIF]',
-  address: process.env.NEXT_PUBLIC_LEGAL_ADDRESS || '[DOMICILIO COMPLETO, ESPAÑA]',
+  address:
+    process.env.NEXT_PUBLIC_LEGAL_ADDRESS ||
+    process.env.NEXT_PUBLIC_LEGAL_DOMICILIO ||
+    '[DOMICILIO COMPLETO, ESPAÑA]',
   email: process.env.NEXT_PUBLIC_LEGAL_EMAIL || '[EMAIL DE CONTACTO]',
   product: 'Krono / Donaire Citas',
 }
 
 export const LEGAL_LAST_UPDATE = '15 de noviembre de 2026'
+
+/** Campos legales del titular que aún conservan el marcador `[...]` por defecto. */
+export function getMissingLegalFields(): string[] {
+  const entries: Array<[string, string]> = [
+    ['NEXT_PUBLIC_LEGAL_NAME', LEGAL_OWNER.name],
+    ['NEXT_PUBLIC_LEGAL_NIF', LEGAL_OWNER.nif],
+    ['NEXT_PUBLIC_LEGAL_ADDRESS', LEGAL_OWNER.address],
+    ['NEXT_PUBLIC_LEGAL_EMAIL', LEGAL_OWNER.email],
+  ]
+  return entries
+    .filter(([, value]) => !value.trim() || value.includes('['))
+    .map(([key]) => key)
+}
+
+/**
+ * Contacto comercial para dudas técnicas del plan Llave en Mano.
+ * WhatsApp (NEXT_PUBLIC_SALES_WHATSAPP, solo dígitos con prefijo país) tiene prioridad sobre email.
+ */
+export function getSalesContactLink(
+  planLabel = 'Llave en Mano'
+): { href: string; label: string } | null {
+  const whatsapp = (process.env.NEXT_PUBLIC_SALES_WHATSAPP || '').replace(
+    /\D/g,
+    ''
+  )
+  if (whatsapp.length >= 9) {
+    return {
+      href: `https://wa.me/${whatsapp}?text=${encodeURIComponent(
+        `Hola, tengo una duda técnica antes de contratar el plan ${planLabel}.`
+      )}`,
+      label: 'WhatsApp',
+    }
+  }
+
+  const email = LEGAL_OWNER.email
+  if (email && !email.includes('[') && email.includes('@')) {
+    return {
+      href: `mailto:${email}?subject=${encodeURIComponent(
+        `Duda técnica · plan ${planLabel}`
+      )}`,
+      label: 'Email',
+    }
+  }
+
+  return null
+}
 
 export interface LegalSection {
   heading: string
@@ -183,21 +235,11 @@ export const LEGAL_DOCS: LegalDoc[] = [
   },
 ]
 
-/** Textos de las casillas de aceptación previas al pago */
+/** Casilla única de consentimiento legal y renuncia al desistimiento antes del pago */
 export const CHECKOUT_CONSENTS = [
   {
-    id: 'demo',
+    id: 'legal_and_withdrawal',
     label:
-      'Declaro que he tenido acceso libre e ilimitado a la Demo Interactiva en Vivo antes de comprar y que he podido verificar sus funciones.',
-  },
-  {
-    id: 'terms',
-    label:
-      'He leído y acepto los Términos de Licencia (software entregado «tal cual», sin soporte si se modifica el código y con responsabilidad limitada al importe abonado), el Aviso Legal y la Política de Privacidad.',
-  },
-  {
-    id: 'desistimiento',
-    label:
-      'Solicito la entrega inmediata de la licencia y consiento que, al tratarse de contenido digital, pierdo mi derecho de desistimiento (art. 103.m TRLGDCU).',
+      'Confirmo que he probado la Demo Interactiva en Vivo, acepto los Términos de Licencia (entrega «tal cual», as-is), el Aviso Legal y la Política de Privacidad, y solicito la entrega digital inmediata renunciando al derecho de desistimiento (art. 103.m TRLGDCU).',
   },
 ] as const

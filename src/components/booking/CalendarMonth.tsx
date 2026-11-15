@@ -1,23 +1,40 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  ChevronDown,
+} from 'lucide-react'
 import {
   formatDateKey,
   getMonthDaysGrid,
   calculateAvailableSlots,
 } from '@/lib/calendar'
-import type { Appointment, BlockedSlot, BusinessSettings } from '@/types/booking'
+import {
+  addDaysToIsoDate,
+  getTodayIsoInTimeZone,
+  getZonedDateParts,
+  sanitizeTimeZone,
+  zonedDateTimeToUtc,
+} from '@/lib/timezone'
+import type {
+  Appointment,
+  BlockedSlot,
+  BusinessPublicSettings,
+  PublicBusyInterval,
+} from '@/types/booking'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
 
 interface CalendarMonthProps {
   selectedDate: Date
   onSelectDate: (date: Date) => void
   durationMinutes: number
-  settings: BusinessSettings | null
-  appointments: Appointment[]
-  blockedSlots: BlockedSlot[]
+  settings: BusinessPublicSettings
+  busyIntervals?: PublicBusyInterval[]
+  appointments?: Appointment[]
+  blockedSlots?: BlockedSlot[]
 }
 
 const MONTH_NAMES = [
@@ -42,21 +59,33 @@ export function CalendarMonth({
   onSelectDate,
   durationMinutes,
   settings,
+  busyIntervals,
   appointments,
   blockedSlots,
 }: CalendarMonthProps) {
-  const [currentYear, setCurrentYear] = React.useState(selectedDate.getFullYear())
-  const [currentMonth, setCurrentMonth] = React.useState(selectedDate.getMonth())
+  const tz = sanitizeTimeZone(settings.timezone)
+  const todayIso = getTodayIsoInTimeZone(tz)
+  const [todayYearNum, todayMonthOneNum] = todayIso.split('-').map(Number)
+  const todayParts = {
+    year: todayYearNum,
+    month: todayMonthOneNum - 1,
+  }
 
-  const today = useMemo(() => new Date(), [])
-  const todayKey = formatDateKey(today)
-  const selectedKey = formatDateKey(selectedDate)
+  const selectedKey = formatDateKey(selectedDate, tz)
+  const initialSelectedParts = getZonedDateParts(selectedDate, tz)
 
-  // Desplazamiento de meses
+  const [currentMonth, setCurrentMonth] = useState<number>(
+    initialSelectedParts.month - 1
+  )
+  const [currentYear, setCurrentYear] = useState<number>(
+    initialSelectedParts.year
+  )
+  const [showFullMonthMobile, setShowFullMonthMobile] = useState(false)
+
   const handlePrevMonth = () => {
     if (currentMonth === 0) {
-      setCurrentYear((y) => y - 1)
       setCurrentMonth(11)
+      setCurrentYear((y) => y - 1)
     } else {
       setCurrentMonth((m) => m - 1)
     }
@@ -64,228 +93,296 @@ export function CalendarMonth({
 
   const handleNextMonth = () => {
     if (currentMonth === 11) {
-      setCurrentYear((y) => y + 1)
       setCurrentMonth(0)
+      setCurrentYear((y) => y + 1)
     } else {
       setCurrentMonth((m) => m + 1)
     }
   }
 
-  // Comprobar si se puede retroceder de mes (no ir a meses anteriores al actual)
   const isPrevDisabled =
-    currentYear < today.getFullYear() ||
-    (currentYear === today.getFullYear() && currentMonth <= today.getMonth())
+    currentYear < todayParts.year ||
+    (currentYear === todayParts.year && currentMonth <= todayParts.month)
 
   const daysGrid = useMemo(
-    () => getMonthDaysGrid(currentYear, currentMonth),
-    [currentYear, currentMonth]
+    () => getMonthDaysGrid(currentYear, currentMonth, tz),
+    [currentYear, currentMonth, tz]
   )
 
-  // Próximos 14 días para la tira horizontal móvil
   const quickDays = useMemo(() => {
-    const list: Date[] = []
-    for (let i = 0; i < 14; i++) {
-      const d = new Date()
-      d.setDate(today.getDate() + i)
-      list.push(d)
+    const list: { date: Date; key: string }[] = []
+    for (let i = 0; i < 14; i += 1) {
+      const iso = addDaysToIsoDate(todayIso, i)
+      list.push({
+        key: iso,
+        date: zonedDateTimeToUtc(iso, '12:00', tz),
+      })
     }
     return list
-  }, [today])
+  }, [todayIso, tz])
+
+  // Memorizar mapa diario de disponibilidad para evitar ~45 recálculos en cada clic de día
+  const availabilityMap = useMemo(() => {
+    const map = new Map<string, { availableCount: number }>()
+    const allCandidateDates: { key: string; date: Date }[] = [...quickDays]
+
+    for (const dayDate of daysGrid) {
+      if (!dayDate) continue
+      const key = formatDateKey(dayDate, tz)
+      if (!map.has(key)) {
+        allCandidateDates.push({ key, date: dayDate })
+      }
+    }
+
+    const now = new Date()
+    for (const item of allCandidateDates) {
+      if (map.has(item.key)) continue
+      if (item.key < todayIso) {
+        map.set(item.key, { availableCount: 0 })
+        continue
+      }
+
+      const slots = calculateAvailableSlots({
+        date: item.key,
+        serviceDurationMinutes: durationMinutes,
+        settings,
+        busyIntervals,
+        appointments,
+        blockedSlots,
+        now,
+      })
+
+      const availableCount = slots.filter((s) => s.isAvailable).length
+      map.set(item.key, { availableCount })
+    }
+
+    return map
+  }, [
+    quickDays,
+    daysGrid,
+    durationMinutes,
+    settings,
+    busyIntervals,
+    appointments,
+    blockedSlots,
+    todayIso,
+    tz,
+  ])
+
+  const weekdayShortFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat('es-ES', {
+        weekday: 'short',
+        timeZone: tz,
+      }),
+    [tz]
+  )
+
+  const monthShortFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat('es-ES', {
+        month: 'short',
+        timeZone: tz,
+      }),
+    [tz]
+  )
 
   return (
-    <div className="w-full space-y-4">
-      {/* Tira rápida horizontal para móvil (Instagram ergonomics) */}
-      <div className="block sm:hidden">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
-            Días sugeridos
-          </span>
-          <span className="text-[11px] text-zinc-500">Desliza para más fechas →</span>
+    <div className="space-y-4">
+      {/* Tira rápida de próximos 14 días para móvil (Instagram / Pulgar) */}
+      <div className="sm:hidden space-y-2.5">
+        <div className="flex items-center justify-between text-xs text-zinc-400 px-1">
+          <span>Próximas fechas rápidas</span>
+          <span className="font-mono text-zinc-500">14 días</span>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth touch-manipulation">
-          {quickDays.map((d) => {
-            const key = formatDateKey(d)
+        <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar -mx-4 px-4">
+          {quickDays.map(({ date: d, key }) => {
             const isSelected = key === selectedKey
-            const dayNum = d.getDate()
-            const weekdayShort = d.toLocaleDateString('es-ES', { weekday: 'short' })
-
-            // Disponibilidad rápida
-            const slots = calculateAvailableSlots({
-              targetDate: d,
-              durationMinutes,
-              settings,
-              appointments,
-              blockedSlots,
-            })
-            const availableCount = slots.filter((s) => s.isAvailable).length
-            const isClosed = slots.length === 0
+            const info = availabilityMap.get(key)
+            const availableCount = info?.availableCount ?? 0
+            const isUnavailable = availableCount === 0
+            const parts = getZonedDateParts(d, tz)
 
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => onSelectDate(d)}
-                disabled={isClosed || availableCount === 0}
+                disabled={isUnavailable}
+                aria-pressed={isSelected}
+                aria-label={`${parts.day} ${monthShortFmt.format(d)}, ${availableCount} huecos disponibles`}
                 className={cn(
-                  'flex flex-col items-center justify-center min-w-[62px] h-[72px] rounded-2xl p-2 transition-all duration-200 border cursor-pointer select-none shrink-0',
+                  'flex flex-col items-center justify-center min-w-[64px] min-h-[72px] rounded-2xl p-2 transition-all duration-200 border select-none shrink-0',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400',
                   isSelected
-                    ? 'bg-white text-zinc-950 border-white shadow-md font-medium'
-                    : isClosed || availableCount === 0
-                    ? 'bg-zinc-900/20 border-white/5 text-zinc-600 opacity-40 cursor-not-allowed'
-                    : 'bg-zinc-900/60 border-white/10 text-zinc-300 hover:border-white/20 active:scale-95'
+                    ? 'ui-btn-contrast border-transparent shadow-md font-semibold'
+                    : isUnavailable
+                      ? 'ui-slot-disabled cursor-not-allowed'
+                      : 'bg-zinc-900/60 border-white/10 text-zinc-200 hover:border-white/25 active:scale-[0.98]'
                 )}
               >
-                <span className="text-[11px] uppercase tracking-wider font-sans font-normal opacity-80">
-                  {weekdayShort}
+                <span
+                  className={cn(
+                    'text-[10px] uppercase font-medium tracking-wider',
+                    isSelected ? 'opacity-80' : 'text-zinc-400'
+                  )}
+                >
+                  {weekdayShortFmt.format(d).slice(0, 3)}
                 </span>
-                <span className="text-lg font-mono font-bold leading-tight my-0.5">
-                  {dayNum}
+                <span className="text-lg font-bold font-mono my-0.5">
+                  {parts.day}
                 </span>
                 <span
                   className={cn(
-                    'text-[9px] font-mono leading-none',
+                    'text-[10px]',
                     isSelected
-                      ? 'text-zinc-700 font-semibold'
-                      : availableCount > 0
-                      ? 'text-emerald-400'
-                      : 'text-zinc-600'
+                      ? 'text-emerald-600 font-semibold'
+                      : isUnavailable
+                        ? 'font-normal'
+                        : 'text-emerald-400 font-medium'
                   )}
                 >
-                  {isClosed ? 'Cerrado' : availableCount > 0 ? `${availableCount} libres` : 'Lleno'}
+                  {isUnavailable ? 'Cerrado' : `${availableCount} libres`}
                 </span>
               </button>
             )
           })}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowFullMonthMobile((prev) => !prev)}
+          aria-expanded={showFullMonthMobile}
+          className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-all active:scale-[0.98] flex items-center justify-between"
+        >
+          <span className="flex items-center gap-2">
+            <CalendarIcon className="w-4 h-4 text-emerald-400" />
+            <span>
+              {showFullMonthMobile
+                ? 'Ocultar calendario completo del mes'
+                : 'Ver calendario completo del mes'}
+            </span>
+          </span>
+          <ChevronDown
+            className={cn(
+              'w-4 h-4 text-zinc-400 transition-transform duration-200',
+              showFullMonthMobile && 'rotate-180'
+            )}
+          />
+        </button>
       </div>
 
-      {/* Calendario mensual interactivo */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-zinc-900/40 border border-white/10 backdrop-blur-md">
-        {/* Encabezado del mes */}
+      {/* Calendario mensual completo (visible en desktop y colapsable en móvil) */}
+      <div
+        className={cn(
+          'p-4 sm:p-5 rounded-2xl bg-zinc-900/40 border border-white/10 backdrop-blur-md shadow-sm',
+          showFullMonthMobile ? 'block' : 'hidden sm:block'
+        )}
+      >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-emerald-400" />
-            <h4 className="text-base font-semibold text-zinc-100 tracking-tight capitalize">
+            <CalendarIcon className="w-4 h-4 text-zinc-400" />
+            <h3 className="text-base font-medium text-zinc-100">
               {MONTH_NAMES[currentMonth]} {currentYear}
-            </h4>
+            </h3>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handlePrevMonth}
               disabled={isPrevDisabled}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
               aria-label="Mes anterior"
+              className="min-w-12 min-h-12 rounded-xl flex items-center justify-center border border-white/10 text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
               aria-label="Mes siguiente"
+              className="min-w-12 min-h-12 rounded-xl flex items-center justify-center border border-white/10 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors active:scale-[0.98]"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Cabecera de días de la semana */}
-        <div className="grid grid-cols-7 gap-1.5 mb-2 text-center">
-          {WEEKDAY_NAMES.map((name, i) => (
+        <div className="grid grid-cols-7 gap-1.5 text-center mb-2">
+          {WEEKDAY_NAMES.map((day) => (
             <div
-              key={i}
-              className="text-xs font-mono font-medium text-zinc-500 py-1"
+              key={day}
+              className="text-[11px] font-medium text-zinc-400 py-1 uppercase"
             >
-              {name}
+              {day}
             </div>
           ))}
         </div>
 
-        {/* Rejilla de días */}
         <div className="grid grid-cols-7 gap-1.5 text-center">
           {daysGrid.map((dayDate, index) => {
             if (!dayDate) {
-              return <div key={`empty-${index}`} className="h-11 sm:h-12" />
+              return <div key={`empty-${index}`} className="min-h-12" />
             }
 
-            const key = formatDateKey(dayDate)
+            const key = formatDateKey(dayDate, tz)
+            const parts = getZonedDateParts(dayDate, tz)
             const isSelected = key === selectedKey
-            const isToday = key === todayKey
-
-            // Calcular disponibilidad de este día
-            const slots = calculateAvailableSlots({
-              targetDate: dayDate,
-              durationMinutes,
-              settings,
-              appointments,
-              blockedSlots,
-            })
-            const availableCount = slots.filter((s) => s.isAvailable).length
-            const isPast = dayDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())
-            const isClosed = slots.length === 0
-            const isFullyBooked = !isPast && !isClosed && availableCount === 0
-            const isDisabled = isPast || isClosed || isFullyBooked
+            const isToday = key === todayIso
+            const isPast = key < todayIso
+            const info = availabilityMap.get(key)
+            const availableCount = info?.availableCount ?? 0
+            const isDisabled = isPast || availableCount === 0
 
             return (
-              <motion.button
+              <button
                 key={key}
                 type="button"
-                whileTap={{ scale: isDisabled ? 1 : 0.95 }}
                 onClick={() => {
-                  if (!isDisabled) {
-                    onSelectDate(dayDate)
-                  }
+                  onSelectDate(dayDate)
+                  setShowFullMonthMobile(false)
                 }}
                 disabled={isDisabled}
+                aria-pressed={isSelected}
+                aria-label={`${parts.day} de ${MONTH_NAMES[currentMonth]}, ${availableCount} huecos`}
                 className={cn(
-                  'relative h-11 sm:h-12 w-full rounded-xl flex flex-col items-center justify-center transition-all duration-200 select-none text-xs font-mono',
+                  'relative min-h-12 w-full rounded-xl flex flex-col items-center justify-center transition-all duration-200 select-none text-xs font-mono',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400',
                   isSelected
-                    ? 'bg-white text-zinc-950 font-bold shadow-md ring-2 ring-emerald-500/50'
-                    : isToday
-                    ? 'border border-emerald-500/50 text-emerald-400 hover:bg-zinc-800'
-                    : isDisabled
-                    ? 'text-zinc-600 cursor-not-allowed bg-zinc-950/20'
-                    : 'text-zinc-200 hover:bg-zinc-800/80 hover:text-white border border-transparent'
+                    ? 'ui-btn-contrast font-bold shadow-md ring-2 ring-emerald-500/60'
+                    : isToday && !isDisabled
+                      ? 'border border-emerald-500/60 text-emerald-400 hover:bg-zinc-800'
+                      : isDisabled
+                        ? 'ui-slot-disabled border cursor-not-allowed'
+                        : 'text-zinc-200 hover:bg-zinc-800/80 hover:text-white border border-transparent active:scale-[0.98]'
                 )}
               >
-                <span className={cn('text-sm', isSelected && 'font-extrabold')}>
-                  {dayDate.getDate()}
-                </span>
-
-                {/* Indicador de estado */}
+                <span>{parts.day}</span>
                 {!isDisabled && (
                   <span
                     className={cn(
                       'w-1.5 h-1.5 rounded-full mt-0.5',
-                      isSelected ? 'bg-zinc-950' : 'bg-emerald-400'
+                      isSelected ? 'bg-emerald-500' : 'bg-emerald-500/70'
                     )}
                   />
                 )}
-
-                {isFullyBooked && (
-                  <span className="text-[9px] text-zinc-600 leading-none">Lleno</span>
-                )}
-              </motion.button>
+              </button>
             )
           })}
         </div>
 
-        {/* Leyenda sutil */}
-        <div className="flex items-center justify-center gap-5 mt-4 pt-3 border-t border-white/5 text-[11px] text-zinc-400">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Disponible</span>
+        <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-400">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Huecos libres
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-zinc-500" />
+              Completo / Cerrado
+            </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-zinc-700" />
-            <span>Ocupado / Cerrado</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-white" />
-            <span>Seleccionado</span>
-          </div>
+          <span className="font-mono text-zinc-400">{tz}</span>
         </div>
       </div>
     </div>
