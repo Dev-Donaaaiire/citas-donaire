@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local backup & migration helpers
+.antigravity_mcp_config
+readmeP.txt
+readmeP.md
