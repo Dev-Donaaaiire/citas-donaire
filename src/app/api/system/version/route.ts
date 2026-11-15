@@ -16,15 +16,15 @@ export async function OPTIONS() {
 
 export async function GET() {
   const versionPayload = {
-    version: CURRENT_SYSTEM_VERSION,
-    commitHash: '54c9f0a',
+    version: '1.2.1',
+    commitHash: 'v1.2.1-live',
     releaseDate: '2026-11-15',
     upstreamRepo: UPSTREAM_GITHUB_REPO,
     changelog: [
-      '✨ Modal interactivo para enviar correos a clientes con plantillas editables y selector de reactivación/disponibilidad.',
-      '⚡ Envío de emails reales en producción con la API de Resend.',
-      '🔑 Puente de validación de licencias transparente para despliegues independientes en 1 clic.',
-      '📱 Ajustes de diseño de élite: touch targets ≥ 48px y superficies táctiles en modo oscuro.',
+      '🏷️ Nuevo indicador visual de versión (v1.2.1) en la cabecera del panel de administración.',
+      '✨ Modal interactivo para enviar correos a clientes con plantillas editables.',
+      '⚡ Envío de emails reales con la API de Resend.',
+      '🔄 Sistema centralizado de sincronización y actualizaciones.',
     ],
   }
 
