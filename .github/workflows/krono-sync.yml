@@ -1,9 +1,7 @@
 name: Krono Auto-Sync & Update
 
 on:
-  workflow_dispatch: # Permite ejecutar la actualización con 1 clic desde GitHub
-  schedule:
-    - cron: '0 4 * * 1' # Cada lunes a las 04:00 UTC
+  workflow_dispatch:
 
 permissions:
   contents: write
