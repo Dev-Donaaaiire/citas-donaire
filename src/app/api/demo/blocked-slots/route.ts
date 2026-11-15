@@ -1,10 +1,14 @@
-import crypto from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { isDbDemoModeActive } from '@/lib/demo-guard'
 import {
   createBlockedSlotServer,
   deleteBlockedSlotServer,
 } from '@/lib/data/admin-dashboard'
+import {
+  addDemoSandboxBlockedSlot,
+  deleteDemoSandboxBlockedSlot,
+  DEMO_SANDBOX_COOKIE_NAME,
+} from '@/lib/demo-sandbox'
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -18,19 +22,32 @@ export async function POST(request: NextRequest) {
     }
 
     if (!(await isDbDemoModeActive())) {
-      return NextResponse.json(
+      const deltaCookie = request.cookies.get(DEMO_SANDBOX_COOKIE_NAME)?.value
+      const result = addDemoSandboxBlockedSlot(
+        {
+          fechaInicio: body.fechaInicio || new Date().toISOString(),
+          fechaFin: body.fechaFin || new Date().toISOString(),
+          motivo: body.motivo?.trim() || 'Bloqueo de prueba (Sandbox)',
+        },
+        deltaCookie
+      )
+
+      const response = NextResponse.json(
         {
           sandbox: true,
-          blockedSlot: {
-            id: crypto.randomUUID(),
-            fecha_inicio: body.fechaInicio || new Date().toISOString(),
-            fecha_fin: body.fechaFin || new Date().toISOString(),
-            motivo: body.motivo?.trim() || 'Bloqueo de prueba (Sandbox)',
-            created_at: new Date().toISOString(),
-          },
+          blockedSlot: result.blockedSlot,
         },
         { status: 201 }
       )
+
+      response.cookies.set(DEMO_SANDBOX_COOKIE_NAME, result.serializedCookie, {
+        path: '/',
+        httpOnly: false,
+        sameSite: 'lax',
+        maxAge: 86400 * 7,
+      })
+
+      return response
     }
 
     const slot = await createBlockedSlotServer({
@@ -60,7 +77,19 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (!(await isDbDemoModeActive())) {
-      return NextResponse.json({ success: true, sandbox: true })
+      const deltaCookie = request.cookies.get(DEMO_SANDBOX_COOKIE_NAME)?.value
+      const result = deleteDemoSandboxBlockedSlot(id, deltaCookie)
+
+      const response = NextResponse.json({ success: true, sandbox: true })
+
+      response.cookies.set(DEMO_SANDBOX_COOKIE_NAME, result.serializedCookie, {
+        path: '/',
+        httpOnly: false,
+        sameSite: 'lax',
+        maxAge: 86400 * 7,
+      })
+
+      return response
     }
 
     const result = await deleteBlockedSlotServer(id)

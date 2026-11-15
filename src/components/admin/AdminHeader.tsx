@@ -14,12 +14,15 @@ import {
   AlertTriangle,
   Settings,
   LogOut,
+  Smartphone,
 } from 'lucide-react'
 import { triggerDemoReset } from '@/lib/booking-service'
 import type { BusinessSettings } from '@/types/booking'
 import type { LicenseVerificationResult } from '@/lib/license'
 import { useIsDemo } from '@/lib/use-is-demo'
 import { useFeedback } from '@/components/ui/FeedbackProvider'
+import { cn } from '@/lib/utils'
+import { InstallAppModal } from '@/components/admin/InstallAppModal'
 
 interface AdminHeaderProps {
   settings: BusinessSettings | null
@@ -42,8 +45,55 @@ export function AdminHeader({
 
   const [isResetting, setIsResetting] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isTogglingMode, setIsTogglingMode] = useState(false)
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<number | null>(null)
+
+  const handleToggleDemoMode = async () => {
+    if (isDemoRoute) return
+    const currentMode = Boolean(settings?.modo_demo)
+    const targetMode = !currentMode
+
+    const confirmed = await confirmAction({
+      title: targetMode ? '¿Activar Modo Demo?' : '¿Cambiar a Modo Producción?',
+      description: targetMode
+        ? 'En Modo Demo podrás agendar citas de prueba, probar recordatorios y restaurar datos de ejemplo en cualquier momento.'
+        : 'En Modo Producción las reservas operarán con clientes reales y la agenda de producción.',
+      confirmLabel: targetMode ? 'Sí, activar Demo' : 'Sí, activar Producción',
+      cancelLabel: 'Cancelar',
+      tone: targetMode ? 'neutral' : 'danger',
+    })
+
+    if (!confirmed) return
+
+    setIsTogglingMode(true)
+    try {
+      const res = await fetch('/api/admin/toggle-demo-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: targetMode }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'No se pudo cambiar el modo.')
+
+      notify({
+        type: 'success',
+        title: targetMode ? 'Modo Demo Activado' : 'Modo Producción Activado',
+        description: data.message,
+      })
+      onRefresh?.()
+      router.refresh()
+    } catch (err) {
+      notify({
+        type: 'error',
+        title: 'Error cambiando el modo',
+        description: err instanceof Error ? err.message : 'Inténtalo de nuevo.',
+      })
+    } finally {
+      setIsTogglingMode(false)
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -158,12 +208,33 @@ export function AdminHeader({
                   <AlertTriangle className="w-2.5 h-2.5" />
                   <span>Licencia: {license.status}</span>
                 </Link>
-              ) : settings?.modo_demo ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/25">
-                  <Sparkles className="w-2.5 h-2.5" />
-                  <span>Modo Demo</span>
-                </span>
               ) : null}
+
+              {!isDemoRoute && (
+                <button
+                  type="button"
+                  onClick={handleToggleDemoMode}
+                  disabled={isTogglingMode}
+                  title={
+                    settings?.modo_demo
+                      ? 'Click para cambiar a Modo Producción'
+                      : 'Click para activar Modo Demo'
+                  }
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider transition-all active:scale-95 cursor-pointer',
+                    settings?.modo_demo
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25'
+                      : 'bg-zinc-850 text-zinc-400 border border-white/10 hover:text-zinc-200 hover:border-white/20'
+                  )}
+                >
+                  {isTogglingMode ? (
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-2.5 h-2.5" />
+                  )}
+                  <span>{settings?.modo_demo ? 'Modo Demo' : 'Modo Demo: Off'}</span>
+                </button>
+              )}
             </div>
             <p className="text-[11px] text-zinc-400 font-mono truncate">
               Gestión de Agenda &amp; Retención · {settings?.timezone || 'Europe/Madrid'}
@@ -192,6 +263,17 @@ export function AdminHeader({
                 <span className="hidden md:inline">Link Bio IG</span>
               </>
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsInstallModalOpen(true)}
+            aria-label="Instalar app en la pantalla de inicio del móvil"
+            title="Guardar icono en tu móvil para entrar en 1 toque"
+            className="min-h-12 min-w-12 px-3.5 rounded-xl bg-zinc-900 border border-white/10 text-zinc-200 hover:bg-zinc-800 hover:text-white transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium cursor-pointer"
+          >
+            <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="hidden md:inline">App Móvil</span>
           </button>
 
           {(settings?.modo_demo || isDemoRoute) && (
@@ -249,6 +331,12 @@ export function AdminHeader({
           )}
         </div>
       </div>
+
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        businessName={settings?.nombre_negocio || 'tu local'}
+      />
     </header>
   )
 }

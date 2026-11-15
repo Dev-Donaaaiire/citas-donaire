@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isDbDemoModeActive } from '@/lib/demo-guard'
 import { toggleClientBlacklistServer } from '@/lib/data/admin-dashboard'
+import {
+  DEMO_SANDBOX_COOKIE_NAME,
+  toggleDemoSandboxClientBlacklist,
+} from '@/lib/demo-sandbox'
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -22,11 +26,27 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (!(await isDbDemoModeActive())) {
-      return NextResponse.json({
+      const deltaCookie = request.cookies.get(DEMO_SANDBOX_COOKIE_NAME)?.value
+      const result = toggleDemoSandboxClientBlacklist(
+        clientId,
+        body.currentlyBlocked,
+        deltaCookie
+      )
+
+      const response = NextResponse.json({
         success: true,
         sandbox: true,
-        newStatus: !body.currentlyBlocked,
+        newStatus: result.newStatus,
       })
+
+      response.cookies.set(DEMO_SANDBOX_COOKIE_NAME, result.serializedCookie, {
+        path: '/',
+        httpOnly: false,
+        sameSite: 'lax',
+        maxAge: 86400 * 7,
+      })
+
+      return response
     }
 
     const result = await toggleClientBlacklistServer(

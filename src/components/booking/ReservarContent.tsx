@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   ArrowRight,
   RefreshCw,
+  Lock,
 } from 'lucide-react'
 import {
   fetchPublicAvailabilityData,
@@ -614,6 +615,23 @@ export function ReservarContent({
           )}
         </AnimatePresence>
       </main>
+
+      {/* Pie de página discreto con acceso para el dueño */}
+      <footer className="mt-16 py-8 border-t border-white/5 text-center text-xs text-zinc-500">
+        <div className="max-w-2xl mx-auto px-4 flex items-center justify-between gap-4">
+          <span className="font-mono text-[11px] text-zinc-500 truncate">
+            {settings.nombre_negocio || 'Reservas Online'}
+          </span>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 transition-colors py-1 px-2.5 rounded-lg hover:bg-zinc-900/60 font-mono text-[11px]"
+            title="Acceso de propietario al panel"
+          >
+            <Lock className="w-3 h-3 text-zinc-500" />
+            <span>Acceso Dueño</span>
+          </Link>
+        </div>
+      </footer>
 
       {/* Barra pegajosa inferior para el pulgar en pasos 1 y 2 */}
       {step < 3 && (

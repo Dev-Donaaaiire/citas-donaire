@@ -1,5 +1,6 @@
 import { connection, NextRequest, NextResponse } from 'next/server'
 import { getAdminDashboardData } from '@/lib/data/admin-dashboard'
+import { DEMO_SANDBOX_COOKIE_NAME } from '@/lib/demo-sandbox'
 
 export async function GET(request: NextRequest) {
   await connection()
@@ -9,6 +10,9 @@ export async function GET(request: NextRequest) {
     const clientFilter =
       rawFilter === 'risk' || rawFilter === 'blocked' ? rawFilter : 'all'
 
+    const deltaCookie =
+      request.cookies.get(DEMO_SANDBOX_COOKIE_NAME)?.value || null
+
     const data = await getAdminDashboardData({
       fromIso: sp.get('from'),
       toIso: sp.get('to'),
@@ -17,6 +21,7 @@ export async function GET(request: NextRequest) {
       clientFilter,
       clientSearch: sp.get('clientSearch'),
       demoRoute: true,
+      sandboxDeltaCookie: deltaCookie,
     })
 
     return NextResponse.json(data, {

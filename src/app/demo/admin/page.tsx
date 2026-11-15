@@ -1,9 +1,13 @@
 import React, { Suspense } from 'react'
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { connection } from 'next/server'
 import { Loader2 } from 'lucide-react'
 import { AdminContent } from '@/components/admin/AdminContent'
 import { getAdminDashboardData } from '@/lib/data/admin-dashboard'
+
+const showSalesLanding =
+  process.env.NEXT_PUBLIC_SHOW_SALES_LANDING?.trim().toLowerCase() === 'true'
 
 export const metadata: Metadata = {
   title: 'Demo Panel del Dueño | Krono',
@@ -11,6 +15,10 @@ export const metadata: Metadata = {
 }
 
 async function DemoAdminLoader() {
+  if (!showSalesLanding) {
+    redirect('/admin')
+  }
+
   await connection()
   const initialData = await getAdminDashboardData({ demoRoute: true })
   return <AdminContent initialData={initialData} />
