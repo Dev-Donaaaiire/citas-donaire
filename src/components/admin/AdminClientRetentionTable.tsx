@@ -22,6 +22,7 @@ import {
   sendRetentionReminder,
   toggleClientBlacklist,
 } from '@/lib/booking-service'
+import { AdminSendEmailModal } from '@/components/admin/AdminSendEmailModal'
 import { cn } from '@/lib/utils'
 import { useFeedback } from '@/components/ui/FeedbackProvider'
 
@@ -67,7 +68,7 @@ export function AdminClientRetentionTable({
 
   const [localSearch, setLocalSearch] = useState(searchQuery)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [emailingId, setEmailingId] = useState<string | null>(null)
+  const [clientForEmail, setClientForEmail] = useState<Client | null>(null)
   const [emailedIds, setEmailedIds] = useState<Record<string, boolean>>({})
   const emailTimersRef = useRef<Record<string, number>>({})
   const searchDebounceRef = useRef<number | null>(null)
@@ -154,33 +155,17 @@ export function AdminClientRetentionTable({
     window.open(waUrl, '_blank', 'noopener,noreferrer')
   }
 
-  const handleSendEmailReminder = async (client: Client) => {
-    setEmailingId(client.id)
-    try {
-      const data = await sendRetentionReminder(client.id, isDemo)
-      setEmailedIds((prev) => ({ ...prev, [client.id]: true }))
-      notify({
-        type: 'success',
-        title: data.simulated
-          ? 'Recordatorio simulado (Demo/Resend sandbox)'
-          : 'Recordatorio enviado por email',
-        description: `Destinatario: ${client.email}`,
-      })
-      if (emailTimersRef.current[client.id]) {
-        window.clearTimeout(emailTimersRef.current[client.id])
-      }
-      emailTimersRef.current[client.id] = window.setTimeout(() => {
-        setEmailedIds((prev) => ({ ...prev, [client.id]: false }))
-      }, 3500)
-    } catch (err) {
-      notify({
-        type: 'error',
-        title: 'Error enviando el recordatorio',
-        description: err instanceof Error ? err.message : undefined,
-      })
-    } finally {
-      setEmailingId(null)
+  const handleEmailSuccess = (
+    client: Client,
+    result: { simulated?: boolean; warning?: string }
+  ) => {
+    setEmailedIds((prev) => ({ ...prev, [client.id]: true }))
+    if (emailTimersRef.current[client.id]) {
+      window.clearTimeout(emailTimersRef.current[client.id])
     }
+    emailTimersRef.current[client.id] = window.setTimeout(() => {
+      setEmailedIds((prev) => ({ ...prev, [client.id]: false }))
+    }, 4000)
   }
 
   const totalPages = Math.max(
@@ -320,19 +305,21 @@ export function AdminClientRetentionTable({
 
                       <button
                         type="button"
-                        disabled={emailingId === client.id}
-                        onClick={() => handleSendEmailReminder(client)}
-                        aria-label={`Enviar email de reactivación a ${client.nombre}`}
-                        className="flex-1 min-h-12 px-3 rounded-xl bg-zinc-950 border border-white/10 text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
+                        onClick={() => setClientForEmail(client)}
+                        aria-label={`Enviar email a ${client.nombre}`}
+                        className={cn(
+                          'flex-1 min-h-12 px-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]',
+                          emailedIds[client.id]
+                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                            : 'bg-zinc-950 border-white/10 text-zinc-200 hover:bg-zinc-900'
+                        )}
                       >
-                        {emailingId === client.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : emailedIds[client.id] ? (
+                        {emailedIds[client.id] ? (
                           <Check className="w-4 h-4 text-emerald-400" />
                         ) : (
                           <Mail className="w-4 h-4" />
                         )}
-                        <span>Email</span>
+                        <span>{emailedIds[client.id] ? 'Enviado' : 'Email'}</span>
                       </button>
                     </>
                   )}
@@ -486,19 +473,16 @@ export function AdminClientRetentionTable({
 
                               <button
                                 type="button"
-                                disabled={emailingId === client.id}
-                                onClick={() => handleSendEmailReminder(client)}
+                                onClick={() => setClientForEmail(client)}
                                 aria-label={`Recordar por email a ${client.nombre}`}
                                 className={cn(
-                                  'min-h-12 min-w-12 px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-50',
+                                  'min-h-12 min-w-12 px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]',
                                   emailedIds[client.id]
                                     ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                                     : 'bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800'
                                 )}
                               >
-                                {emailingId === client.id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : emailedIds[client.id] ? (
+                                {emailedIds[client.id] ? (
                                   <Check className="w-4 h-4" />
                                 ) : (
                                   <Mail className="w-4 h-4" />
@@ -581,6 +565,15 @@ export function AdminClientRetentionTable({
           </div>
         </div>
       )}
+      {/* Modal para personalizar y enviar email */}
+      <AdminSendEmailModal
+        isOpen={Boolean(clientForEmail)}
+        client={clientForEmail}
+        businessName={businessName}
+        isDemo={isDemo}
+        onClose={() => setClientForEmail(null)}
+        onSuccess={handleEmailSuccess}
+      />
     </div>
   )
 }

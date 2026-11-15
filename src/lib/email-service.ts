@@ -369,21 +369,42 @@ export function buildClientReminderEmailHtml(params: {
   businessName: string
   lastVisitFormatted: string
   bookingUrl: string
+  customSubject?: string | null
+  customMessage?: string | null
 }): string {
   const firstName = params.clientName.trim().split(' ')[0] || params.clientName
+  const subjectTitle =
+    params.customSubject?.trim() ||
+    `¡Te echamos de menos en ${params.businessName}!`
+
+  let bodyParagraphsHtml: string
+  if (params.customMessage?.trim()) {
+    const escaped = escapeHtml(params.customMessage.trim())
+    bodyParagraphsHtml = escaped
+      .split(/\n{2,}/)
+      .map(
+        (p) =>
+          `<p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#d4d4d8;">${p.replace(/\n/g, '<br/>')}</p>`
+      )
+      .join('')
+  } else {
+    bodyParagraphsHtml = `
+      <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#f4f4f5;">
+        Hola <strong>${escapeHtml(firstName)}</strong>,
+      </p>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.65;color:#d4d4d8;">
+        Desde <strong style="color:#ffffff;">${escapeHtml(params.businessName)}</strong> queremos saludarte. Hemos visto que tu última visita fue <strong>${escapeHtml(params.lastVisitFormatted)}</strong> y nos encantaría volver a verte pronto.
+      </p>
+      <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:#a1a1aa;">
+        ¿Te apetece renovar tu estilo esta semana? Puedes ver nuestros huecos libres en tiempo real y reservar en 30 segundos, sin esperas ni llamadas telefónicas.
+      </p>
+    `
+  }
 
   const bodyHtml = `
-    <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#f4f4f5;">
-      Hola <strong>${escapeHtml(firstName)}</strong>,
-    </p>
-    <p style="margin:0 0 16px;font-size:14px;line-height:1.65;color:#d4d4d8;">
-      Desde <strong style="color:#ffffff;">${escapeHtml(params.businessName)}</strong> queremos saludarte. Hemos visto que tu última visita fue <strong>${escapeHtml(params.lastVisitFormatted)}</strong> y nos encantaría volver a verte pronto.
-    </p>
-    <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:#a1a1aa;">
-      ¿Te apetece renovar tu estilo esta semana? Puedes ver nuestros huecos libres en tiempo real y reservar en 30 segundos, sin esperas ni llamadas telefónicas.
-    </p>
+    ${bodyParagraphsHtml}
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
       <tr>
         <td align="center">
           <a href="${escapeHtml(params.bookingUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;box-sizing:border-box;text-align:center;padding:14px 22px;border-radius:10px;background-color:#10b981;color:#09090b;font-size:14px;font-weight:700;text-decoration:none;">
@@ -395,12 +416,12 @@ export function buildClientReminderEmailHtml(params: {
   `
 
   return renderEmailShell({
-    preheader: `${firstName}, te echamos de menos en ${params.businessName}. Reserva tu próxima cita en 30 segundos.`,
-    badge: 'Recordatorio Preferente',
-    title: '¿Renovamos tu estilo esta semana?',
-    subtitle: `${params.businessName} · Reserva rápida sin llamadas`,
+    preheader: `${firstName}, te saludamos desde ${params.businessName}. Reserva tu cita en 30 segundos.`,
+    badge: 'Aviso Preferente',
+    title: subjectTitle,
+    subtitle: `${params.businessName} · Contacto directo`,
     bodyHtml,
-    footerNote: `Recibes este aviso de cortesía porque eres cliente de ${params.businessName}.`,
+    footerNote: `Recibes este correo porque eres cliente de ${params.businessName}.`,
   })
 }
 
@@ -579,6 +600,8 @@ export async function sendClientReminderEmail(input: {
   lastVisit?: string | null
   timezone?: string | null
   baseUrl: string
+  customSubject?: string | null
+  customMessage?: string | null
 }) {
   const cleanBaseUrl = input.baseUrl.replace(/\/$/, '')
   const bookingUrl = `${cleanBaseUrl}/reservar`
@@ -599,6 +622,8 @@ export async function sendClientReminderEmail(input: {
     businessName: input.businessName,
     lastVisitFormatted,
     bookingUrl,
+    customSubject: input.customSubject,
+    customMessage: input.customMessage,
   })
 
   const resend = getResendClient()
@@ -607,27 +632,35 @@ export async function sendClientReminderEmail(input: {
     return {
       success: true,
       simulated: true,
+      reason: 'missing_resend_api_key',
+      warning:
+        'RESEND_API_KEY no configurada. El correo ha sido simulado.',
       bookingUrl,
     }
   }
 
-  const { error } = await resend.emails.send({
+  const subject =
+    input.customSubject?.trim() ||
+    `¡Te echamos de menos en ${input.businessName}! Reserva tu próxima cita`
+
+  const { data, error } = await resend.emails.send({
     from: DEFAULT_FROM,
     to: input.clientEmail,
-    subject: `¡Te echamos de menos en ${input.businessName}! Reserva tu próxima cita`,
+    subject,
     html,
   })
 
   if (error) {
     if (isResendSandboxOrDomainError(error.message)) {
       console.warn(
-        'Resend en modo sandbox o dominio sin verificar; degradando recordatorio a modo simulado:',
+        'Resend en modo sandbox o dominio sin verificar:',
         error.message
       )
       return {
         success: true,
         simulated: true,
         reason: 'resend_domain_unverified',
+        warning: `Resend en sandbox (${DEFAULT_FROM}): ${error.message}`,
         bookingUrl,
       }
     }
@@ -637,6 +670,7 @@ export async function sendClientReminderEmail(input: {
   return {
     success: true,
     simulated: false,
+    emailId: data?.id,
     bookingUrl,
   }
 }
