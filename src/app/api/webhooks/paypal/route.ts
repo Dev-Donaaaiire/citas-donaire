@@ -328,6 +328,7 @@ export async function POST(request: NextRequest) {
       })
 
     let emailResult = { success: false, simulated: false }
+    let emailErrorDetail: string | null = null
     try {
       emailResult = await sendLicenseDeliveryEmail({
         buyerEmail: license.comprador_email,
@@ -338,7 +339,12 @@ export async function POST(request: NextRequest) {
         baseUrl: resolvePublicAppUrl(),
       })
     } catch (emailErr) {
-      console.error('[webhooks/paypal] Error enviando correo de licencia:', emailErr)
+      emailErrorDetail =
+        emailErr instanceof Error ? emailErr.message : String(emailErr)
+      console.error(
+        '[webhooks/paypal] Error enviando correo de licencia:',
+        emailErr
+      )
     }
 
     return NextResponse.json({
@@ -346,8 +352,10 @@ export async function POST(request: NextRequest) {
       eventType,
       alreadyExisted,
       plan,
-      emailDelivered: emailResult.success,
-      emailSimulated: emailResult.simulated,
+      licenseKey: license.license_key,
+      emailDelivered: Boolean(emailResult.success && !emailResult.simulated),
+      emailSimulated: Boolean(emailResult.simulated),
+      emailError: emailErrorDetail,
     })
   } catch (err) {
     console.error('[webhooks/paypal] Error:', err)
