@@ -16,7 +16,10 @@ export const DEFAULT_TUTORIAL_VIDEO_URL =
   process.env.NEXT_PUBLIC_TUTORIAL_VIDEO_URL?.trim() || null
 
 export function buildVercelOneClickDeployUrl(repoUrl?: string): string {
-  const targetRepo = (repoUrl || DEFAULT_REPO_URL).trim()
+  let targetRepo = (repoUrl || DEFAULT_REPO_URL).trim().replace(/\/$/, '')
+  if (!targetRepo.includes('/tree/')) {
+    targetRepo = `${targetRepo}/tree/main`
+  }
   const params = new URLSearchParams({
     'repository-url': targetRepo,
     env: 'NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY',
