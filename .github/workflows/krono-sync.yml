@@ -15,11 +15,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Sincronizar limpiamente con Upstream (Sin conflictos)
+      - name: Sincronizar aplicación con Upstream Oficial
         run: |
           git config user.name "Krono Updater"
           git config user.email "bot@citas-donaire.dev"
           git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git || true
           git fetch upstream main
-          git checkout -B main upstream/main
-          git push origin main --force
+          git checkout upstream/main -- src public package.json package-lock.json next.config.ts tsconfig.json README.md
+          git add -A
+          git commit -m "chore(krono): actualización automática de la aplicación" || echo "Sin cambios nuevos"
+          git push origin main
