@@ -171,30 +171,12 @@ DROP POLICY IF EXISTS "services_delete_anon" ON public.services;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_settings' AND policyname = 'settings_select_authenticated') THEN
-    CREATE POLICY "settings_select_authenticated" ON public.business_settings FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_settings' AND policyname = 'settings_insert_authenticated') THEN
-    CREATE POLICY "settings_insert_authenticated" ON public.business_settings FOR INSERT TO authenticated WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_settings' AND policyname = 'settings_update_authenticated') THEN
-    CREATE POLICY "settings_update_authenticated" ON public.business_settings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_settings' AND policyname = 'settings_all_policy') THEN
+    CREATE POLICY "settings_all_policy" ON public.business_settings FOR ALL TO public USING (true) WITH CHECK (true);
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_select_anon') THEN
-    CREATE POLICY "services_select_anon" ON public.services FOR SELECT TO anon USING (activo = true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_select_authenticated') THEN
-    CREATE POLICY "services_select_authenticated" ON public.services FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_insert_authenticated') THEN
-    CREATE POLICY "services_insert_authenticated" ON public.services FOR INSERT TO authenticated WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_update_authenticated') THEN
-    CREATE POLICY "services_update_authenticated" ON public.services FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_delete_authenticated') THEN
-    CREATE POLICY "services_delete_authenticated" ON public.services FOR DELETE TO authenticated USING (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_all_policy') THEN
+    CREATE POLICY "services_all_policy" ON public.services FOR ALL TO public USING (true) WITH CHECK (true);
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'clients' AND policyname = 'clients_select_authenticated') THEN
