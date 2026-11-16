@@ -6,7 +6,7 @@ import {
 import { sanitizeTimeZone } from '@/lib/timezone'
 
 const DEFAULT_FROM =
-  process.env.RESEND_FROM_EMAIL || 'Krono Citas <onboarding@resend.dev>'
+  process.env.RESEND_FROM_EMAIL || 'Krono Citas <citas@citas.donaire.dev>'
 
 export const DEFAULT_REPO_URL =
   process.env.NEXT_PUBLIC_REPO_URL?.trim() ||
