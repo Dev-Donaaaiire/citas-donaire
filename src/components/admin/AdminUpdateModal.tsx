@@ -119,15 +119,15 @@ export function AdminUpdateModal({
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-white/10 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-white flex items-center gap-1.5">
-                  <GitBranch className="w-4 h-4 text-emerald-400" />
-                  Opción 1: Fusión en 1 Clic desde GitHub
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  Opción 1: Actualizar con 1 Clic (GitHub Actions)
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono">
                   Recomendada
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Abre la comparación oficial contra el repositorio maestro. Solo pulsa en <strong>«Create Pull Request»</strong> y <strong>«Merge»</strong>. Vercel desplegará la actualización solo en 30 segundos.
+                Abre la pantalla de actualización de tu repositorio. Solo pulsa el botón verde <strong>«Run workflow»</strong>. Sincroniza el código oficial automáticamente sin ningún conflicto y Vercel despliega tu negocio actualizado en 30 segundos.
               </p>
               <a
                 href={syncUrl}
@@ -135,7 +135,7 @@ export function AdminUpdateModal({
                 rel="noopener noreferrer"
                 className="w-full min-h-11 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
               >
-                <span>Sincronizar en GitHub y desplegar</span>
+                <span>Abrir y pulsar «Run workflow»</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>

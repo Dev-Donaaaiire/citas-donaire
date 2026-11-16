@@ -64,8 +64,8 @@ export async function checkSystemUpdate(options?: {
 
   let oneClickSyncUrl = `https://github.com/${UPSTREAM_GITHUB_REPO}`
   if (userRepo && !userRepo.includes('Dev-Donaaaiire')) {
-    // URL directa para comparar y fusionar cambios desde el upstream oficial
-    oneClickSyncUrl = `https://github.com/${userRepo}/compare/main...Dev-Donaaaiire:citas-donaire:main`
+    // Enlace directo al workflow de actualización en GitHub Actions
+    oneClickSyncUrl = `https://github.com/${userRepo}/actions/workflows/krono-sync.yml`
   }
 
   try {
