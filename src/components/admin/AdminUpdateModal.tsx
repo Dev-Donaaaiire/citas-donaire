@@ -115,29 +115,77 @@ export function AdminUpdateModal({
               Cómo aplicar la actualización
             </h3>
 
-            {/* Opción 1: Enlace directo en 1 clic */}
-            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-white/10 space-y-2">
+            {/* Opción 1: Enlace directo en 1 clic con guía visual paso a paso */}
+            <div className="p-4 rounded-xl bg-zinc-950/80 border border-emerald-500/30 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-white flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                   <Zap className="w-4 h-4 text-emerald-400" />
-                  Opción 1: Actualizar con 1 Clic (GitHub Actions)
+                  Instrucciones de Actualización en 1 Clic
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono">
-                  Recomendada
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono font-semibold">
+                  Paso a Paso
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Abre la pantalla de actualización de tu repositorio. Solo pulsa el botón verde <strong>«Run workflow»</strong>. Sincroniza el código oficial automáticamente sin ningún conflicto y Vercel despliega tu negocio actualizado en 30 segundos.
-              </p>
+
+              {/* Los 3 pasos explicados con total detalle */}
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-zinc-900/60 border border-white/5">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    1
+                  </span>
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-zinc-200">
+                      Pulsa el botón verde inferior
+                    </p>
+                    <p className="text-[11px] text-zinc-400">
+                      Se abrirá la pantalla de actualización directa de tu repositorio en GitHub.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-zinc-900/60 border border-white/5">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    2
+                  </span>
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-zinc-200">
+                      Haz clic en «Run workflow»
+                    </p>
+                    <p className="text-[11px] text-zinc-400">
+                      A la derecha verás el botón <code className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">Run workflow ▾</code>. Haz clic y confirma pulsando el botón verde.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-zinc-900/60 border border-white/5">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    3
+                  </span>
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-zinc-200">
+                      ¡Listo! Vercel desplegará los cambios solo
+                    </p>
+                    <p className="text-[11px] text-zinc-400">
+                      GitHub sincronizará la aplicación en 5 segundos y Vercel se actualizará. Al recargar este panel verás la versión nueva activa.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botón principal */}
               <a
                 href={syncUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full min-h-11 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                className="w-full min-h-12 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]"
               >
-                <span>Abrir y pulsar «Run workflow»</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <span>1. Abrir GitHub y Actualizar</span>
+                <ExternalLink className="w-4 h-4" />
               </a>
+
+              <p className="text-[10px] text-zinc-500 text-center">
+                🔒 Tus citas, clientes, horarios y servicios en Supabase están 100% seguros y nunca se modifican.
+              </p>
             </div>
 
             {/* Opción 2: Terminal rápido */}

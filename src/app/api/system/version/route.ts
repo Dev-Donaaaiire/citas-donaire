@@ -16,15 +16,15 @@ export async function OPTIONS() {
 
 export async function GET() {
   const versionPayload = {
-    version: '1.2.1',
-    commitHash: 'v1.2.1-live',
-    releaseDate: '2026-11-15',
+    version: '1.2.2',
+    commitHash: 'v1.2.2',
+    releaseDate: '2026-11-16',
     upstreamRepo: UPSTREAM_GITHUB_REPO,
     changelog: [
-      '🏷️ Nuevo indicador visual de versión (v1.2.1) en la cabecera del panel de administración.',
-      '✨ Modal interactivo para enviar correos a clientes con plantillas editables.',
-      '⚡ Envío de emails reales con la API de Resend.',
-      '🔄 Sistema centralizado de sincronización y actualizaciones.',
+      '📋 Nueva guía visual con instrucciones detalladas paso a paso para actualizar.',
+      '✨ Botón de actualización enriquecido con enlace directo a Actions y comprobaciones de seguridad.',
+      '🛡️ Sincronización limpia de archivos de negocio garantizada.',
+      '🏷️ Etiqueta de versión v1.2.2 activa.',
     ],
   }
 
