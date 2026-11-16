@@ -437,7 +437,9 @@ export function SetupContent({
                 ? 'La estructura SQL endurecida y la exclusión GiST están listas.'
                 : !diagnostics.hasServiceRole
                   ? 'Configura SUPABASE_SERVICE_ROLE_KEY primero para diagnosticar tablas.'
-                  : `Faltan tablas: ${diagnostics.missingTables.join(', ')}. Ejecuta el Paso 1.`}
+                  : diagnostics.dbErrorDetail
+                    ? `Error: ${diagnostics.dbErrorDetail}`
+                    : `Faltan tablas: ${diagnostics.missingTables.join(', ')}. Ejecuta el Paso 1.`}
             </p>
           </div>
 

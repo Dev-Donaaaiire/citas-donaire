@@ -18,6 +18,7 @@ export interface SetupDiagnosticsData {
   hasAdminSecret: boolean
   schemaReady: boolean
   missingTables: string[]
+  dbErrorDetail?: string | null
   license: LicenseVerificationResult
 }
 
@@ -40,6 +41,7 @@ export async function getAdminSetupData(): Promise<InitialSetupPayload> {
   const hasAdminSecret = hasExplicitSessionSecret()
 
   let schemaReady = false
+  let dbErrorDetail: string | null = null
   const missingTables: string[] = []
   let settings: BusinessSettings | null = null
   let services: Service[] = []
@@ -63,14 +65,28 @@ export async function getAdminSetupData(): Promise<InitialSetupPayload> {
         db.from('appointments').select('id').limit(1),
       ])
 
-    if (settingsRes.error) missingTables.push('business_settings')
-    if (servicesRes.error) missingTables.push('services')
+    if (settingsRes.error) {
+      missingTables.push('business_settings')
+      dbErrorDetail = settingsRes.error.message || settingsRes.error.details || JSON.stringify(settingsRes.error)
+    }
+    if (servicesRes.error) {
+      missingTables.push('services')
+      if (!dbErrorDetail) dbErrorDetail = servicesRes.error.message
+    }
     if (clientsRes.error) missingTables.push('clients')
     if (appointmentsRes.error) missingTables.push('appointments')
 
     schemaReady = missingTables.length === 0
     settings = settingsRes.data ?? null
     services = servicesRes.data ?? []
+
+    if (!schemaReady) {
+      console.error('[getAdminSetupData] DB diagnostics error:', {
+        missingTables,
+        settingsError: settingsRes.error,
+        servicesError: servicesRes.error,
+      })
+    }
   }
 
   const license = await verifyLicenseServer({
@@ -88,6 +104,7 @@ export async function getAdminSetupData(): Promise<InitialSetupPayload> {
       hasAdminSecret,
       schemaReady,
       missingTables,
+      dbErrorDetail: dbErrorDetail || null,
       license,
     },
     settings,
