@@ -1,13 +1,18 @@
 import React, { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
+import { headers } from 'next/headers'
 import { Loader2 } from 'lucide-react'
 import { LandingPage } from '@/components/landing/LandingPage'
 import { ReservarContent } from '@/components/booking/ReservarContent'
 import { getPublicBookingInitialData } from '@/lib/data/public-booking'
 
 const showSalesLanding =
-  process.env.NEXT_PUBLIC_SHOW_SALES_LANDING?.trim().toLowerCase() === 'true'
+  process.env.NEXT_PUBLIC_SHOW_SALES_LANDING?.trim().toLowerCase() === 'true' ||
+  (process.env.NEXT_PUBLIC_APP_URL || '').toLowerCase().includes('donaire.dev') ||
+  (process.env.NEXT_PUBLIC_APP_URL || '').toLowerCase().includes('citas-donaire') ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL || '').toLowerCase().includes('donaire.dev') ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL || '').toLowerCase().includes('citas-donaire')
 
 export async function generateMetadata(): Promise<Metadata> {
   if (showSalesLanding) {
@@ -64,6 +69,17 @@ interface HomePageProps {
 
 async function HomeBookingLoader({ searchParams }: HomePageProps) {
   await connection()
+
+  const headerList = await headers().catch(() => null)
+  const host = (headerList?.get('host') || '').toLowerCase()
+  if (
+    host.includes('citas.donaire.dev') ||
+    host.includes('citas-donaire') ||
+    host.includes('donaire.dev')
+  ) {
+    return <LandingPage />
+  }
+
   const resolved = (await searchParams) || {}
   const rescheduleToken =
     typeof resolved.rescheduleToken === 'string' && resolved.rescheduleToken.trim()
