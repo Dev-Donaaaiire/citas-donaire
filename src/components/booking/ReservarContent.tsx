@@ -613,6 +613,7 @@ export function ReservarContent({
                 selectedDate={selectedDate}
                 selectedSlot={selectedSlot}
                 timezone={tz}
+                formFields={initialData.settings?.campos_formulario || undefined}
                 onSubmit={handleBookingSubmit}
                 isSubmitting={isSubmitting}
                 submitError={submitError}

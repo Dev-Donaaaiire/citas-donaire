@@ -10,6 +10,7 @@ import {
   DEMO_SANDBOX_COOKIE_NAME,
   getDemoSandboxAdminDataset,
 } from '@/lib/demo-sandbox'
+import { normalizeFormFields } from '@/lib/form-field-rules'
 import type {
   Appointment,
   BlockedSlot,
@@ -334,10 +335,11 @@ export async function getAdminDashboardData(options?: {
       : checkProductionLicenseGate(Boolean(settingsRow?.modo_demo)),
   ])
 
-  const normalizedSettings = settingsRow
+  const normalizedSettings: BusinessSettings | null = settingsRow
     ? {
         ...settingsRow,
         timezone: tz,
+        campos_formulario: normalizeFormFields(settingsRow.campos_formulario),
       }
     : null
 

@@ -262,7 +262,10 @@ export function AdminClientRetentionTable({
                       {client.nombre}
                     </h4>
                     <p className="text-xs font-mono text-zinc-400 truncate mt-0.5">
-                      {client.telefono} · {client.email}
+                      {client.telefono || 'Sin tel'} ·{' '}
+                      {client.email && !client.email.endsWith('@citas.local')
+                        ? client.email
+                        : 'Sin correo'}
                     </p>
                   </div>
                   {client.bloqueado_no_show ? (
@@ -295,9 +298,15 @@ export function AdminClientRetentionTable({
                     <>
                       <button
                         type="button"
+                        disabled={!client.telefono}
                         onClick={() => handleSendWhatsAppReminder(client)}
                         aria-label={`Enviar WhatsApp de reactivación a ${client.nombre}`}
-                        className="flex-1 min-h-12 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                        title={
+                          client.telefono
+                            ? 'Contactar por WhatsApp'
+                            : 'El cliente no proporcionó teléfono'
+                        }
+                        className="flex-1 min-h-12 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <MessageCircle className="w-4 h-4" />
                         <span>WhatsApp</span>
@@ -305,10 +314,18 @@ export function AdminClientRetentionTable({
 
                       <button
                         type="button"
+                        disabled={
+                          !client.email || client.email.endsWith('@citas.local')
+                        }
                         onClick={() => setClientForEmail(client)}
                         aria-label={`Enviar email a ${client.nombre}`}
+                        title={
+                          client.email && !client.email.endsWith('@citas.local')
+                            ? 'Enviar email'
+                            : 'El cliente no proporcionó correo electrónico'
+                        }
                         className={cn(
-                          'flex-1 min-h-12 px-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]',
+                          'flex-1 min-h-12 px-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed',
                           emailedIds[client.id]
                             ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                             : 'bg-zinc-950 border-white/10 text-zinc-200 hover:bg-zinc-900'
@@ -419,9 +436,19 @@ export function AdminClientRetentionTable({
                       </td>
 
                       <td className="py-3.5 px-4 font-mono text-xs text-zinc-300">
-                        <div>{client.telefono}</div>
+                        <div>
+                          {client.telefono || (
+                            <span className="text-zinc-500 italic">Sin tel</span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-zinc-400">
-                          {client.email}
+                          {client.email && !client.email.endsWith('@citas.local') ? (
+                            client.email
+                          ) : (
+                            <span className="text-zinc-500 italic">
+                              Sin correo
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -459,11 +486,17 @@ export function AdminClientRetentionTable({
                             <>
                               <button
                                 type="button"
+                                disabled={!client.telefono}
                                 onClick={() =>
                                   handleSendWhatsAppReminder(client)
                                 }
                                 aria-label={`Recordar por WhatsApp a ${client.nombre}`}
-                                className="min-h-12 min-w-12 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                                title={
+                                  client.telefono
+                                    ? 'Contactar por WhatsApp'
+                                    : 'El cliente no proporcionó teléfono'
+                                }
+                                className="min-h-12 min-w-12 px-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 <MessageCircle className="w-4 h-4" />
                                 <span className="hidden lg:inline">
@@ -473,10 +506,20 @@ export function AdminClientRetentionTable({
 
                               <button
                                 type="button"
+                                disabled={
+                                  !client.email ||
+                                  client.email.endsWith('@citas.local')
+                                }
                                 onClick={() => setClientForEmail(client)}
                                 aria-label={`Recordar por email a ${client.nombre}`}
+                                title={
+                                  client.email &&
+                                  !client.email.endsWith('@citas.local')
+                                    ? 'Enviar email'
+                                    : 'El cliente no proporcionó correo electrónico'
+                                }
                                 className={cn(
-                                  'min-h-12 min-w-12 px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]',
+                                  'min-h-12 min-w-12 px-3 rounded-xl border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed',
                                   emailedIds[client.id]
                                     ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                                     : 'bg-zinc-900 border-white/10 text-zinc-200 hover:bg-zinc-800'

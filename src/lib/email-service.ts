@@ -499,15 +499,26 @@ export async function sendBookingConfirmationEmails(
     contentType: 'text/calendar; charset=utf-8; method=REQUEST',
   }
 
-  const emailJobs = [
-    resend.emails.send({
-      from: DEFAULT_FROM,
-      to: input.clientEmail,
-      subject: `Confirmación de tu cita · ${input.businessName}`,
-      html: clientHtml,
-      attachments: [icsAttachment],
-    }),
-  ]
+  const isValidClientEmail = Boolean(
+    input.clientEmail &&
+    input.clientEmail.trim().length > 3 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.clientEmail.trim()) &&
+    !input.clientEmail.endsWith('@citas.local')
+  )
+
+  const emailJobs = []
+
+  if (isValidClientEmail) {
+    emailJobs.push(
+      resend.emails.send({
+        from: DEFAULT_FROM,
+        to: input.clientEmail.trim(),
+        subject: `Confirmación de tu cita · ${input.businessName}`,
+        html: clientHtml,
+        attachments: [icsAttachment],
+      })
+    )
+  }
 
   if (ownerEmail) {
     emailJobs.push(
@@ -533,15 +544,18 @@ export async function sendBookingConfirmationEmails(
 
   if (errors.length === results.length) {
     if (errors.every(isResendSandboxOrDomainError)) {
-      const fallbackJobs = [
-        resend.emails.send({
-          from: 'Krono Citas <onboarding@resend.dev>',
-          to: input.clientEmail,
-          subject: `Confirmación de tu cita · ${input.businessName}`,
-          html: clientHtml,
-          attachments: [icsAttachment],
-        }),
-      ]
+      const fallbackJobs = []
+      if (isValidClientEmail) {
+        fallbackJobs.push(
+          resend.emails.send({
+            from: 'Krono Citas <onboarding@resend.dev>',
+            to: input.clientEmail.trim(),
+            subject: `Confirmación de tu cita · ${input.businessName}`,
+            html: clientHtml,
+            attachments: [icsAttachment],
+          })
+        )
+      }
       if (ownerEmail) {
         fallbackJobs.push(
           resend.emails.send({

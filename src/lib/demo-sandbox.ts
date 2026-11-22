@@ -12,6 +12,7 @@ import {
   getTodayIsoInTimeZone,
   zonedDateTimeToUtc,
 } from '@/lib/timezone'
+import { DEFAULT_FORM_FIELDS } from '@/lib/form-field-rules'
 
 export const DEMO_SANDBOX_COOKIE_NAME = 'krono_demo_sandbox_delta'
 
@@ -28,6 +29,7 @@ export const DEMO_SANDBOX_SETTINGS: BusinessPublicSettings = {
   direccion: 'Calle Serrano 45, Madrid',
   telefono_contacto: '+34 612 345 678',
   timezone: 'Europe/Madrid',
+  campos_formulario: DEFAULT_FORM_FIELDS,
 }
 
 export const DEMO_SANDBOX_SERVICES: Service[] = [

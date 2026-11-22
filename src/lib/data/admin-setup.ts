@@ -7,6 +7,7 @@ import {
   verifyLicenseServer,
   type LicenseVerificationResult,
 } from '@/lib/license'
+import { normalizeFormFields } from '@/lib/form-field-rules'
 import type { BusinessSettings, Service } from '@/types/booking'
 
 export interface SetupDiagnosticsData {
@@ -77,7 +78,12 @@ export async function getAdminSetupData(): Promise<InitialSetupPayload> {
     if (appointmentsRes.error) missingTables.push('appointments')
 
     schemaReady = missingTables.length === 0
-    settings = settingsRes.data ?? null
+    settings = settingsRes.data
+      ? {
+          ...settingsRes.data,
+          campos_formulario: normalizeFormFields(settingsRes.data.campos_formulario),
+        }
+      : null
     services = servicesRes.data ?? []
 
     if (!schemaReady) {

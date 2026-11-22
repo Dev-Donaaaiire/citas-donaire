@@ -40,7 +40,12 @@ CREATE TABLE IF NOT EXISTS public.business_settings (
 ALTER TABLE public.business_settings
   ADD COLUMN IF NOT EXISTS direccion TEXT,
   ADD COLUMN IF NOT EXISTS telefono_contacto TEXT,
-  ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Europe/Madrid';
+  ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Europe/Madrid',
+  ADD COLUMN IF NOT EXISTS campos_formulario JSONB DEFAULT '{"nombre":{"activo":true,"requerido":true},"email":{"activo":true,"requerido":true},"telefono":{"activo":true,"requerido":true},"notas":{"activo":true,"requerido":false}}'::jsonb;
+
+ALTER TABLE public.clients
+  ALTER COLUMN email DROP NOT NULL,
+  ALTER COLUMN telefono DROP NOT NULL;
 
 DROP TRIGGER IF EXISTS trg_business_settings_updated_at ON public.business_settings;
 CREATE TRIGGER trg_business_settings_updated_at

@@ -13,12 +13,17 @@ import {
 } from 'lucide-react'
 import type { Service, TimeSlot } from '@/types/booking'
 import { formatCurrency, formatDateFull } from '@/lib/format'
+import {
+  normalizeFormFields,
+  type FormCustomizationSettings,
+} from '@/lib/form-field-rules'
 
 interface BookingFormProps {
   service: Service
   selectedDate: Date
   selectedSlot: TimeSlot
   timezone?: string | null
+  formFields?: FormCustomizationSettings
   onSubmit: (data: {
     nombre: string
     email: string
@@ -36,11 +41,14 @@ export function BookingForm({
   selectedDate,
   selectedSlot,
   timezone,
+  formFields,
   onSubmit,
   isSubmitting,
   submitError,
   onBack,
 }: BookingFormProps) {
+  const rules = normalizeFormFields(formFields)
+
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -56,26 +64,40 @@ export function BookingForm({
     const cleanEmail = email.trim().toLowerCase()
     const cleanPhone = telefono.trim()
 
-    if (cleanName.length < 2) {
+    if (rules.nombre.requerido && cleanName.length < 2) {
       setLocalError('Por favor, introduce tu nombre completo.')
       return
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setLocalError('Introduce un correo electrónico válido para enviarte la confirmación.')
+    if (rules.email.activo && rules.email.requerido) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        setLocalError(
+          'Introduce un correo electrónico válido para enviarte la confirmación.'
+        )
+        return
+      }
+    } else if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setLocalError('El correo electrónico introducido no tiene un formato válido.')
       return
     }
 
-    if (cleanPhone.length < 6) {
-      setLocalError('Introduce un número de teléfono válido para avisos de tu cita.')
+    if (rules.telefono.activo && rules.telefono.requerido) {
+      if (cleanPhone.length < 6) {
+        setLocalError(
+          'Introduce un número de teléfono válido para avisos de tu cita.'
+        )
+        return
+      }
+    } else if (cleanPhone && cleanPhone.length < 6) {
+      setLocalError('El número de teléfono introducido no es válido.')
       return
     }
 
     await onSubmit({
-      nombre: cleanName,
+      nombre: cleanName || 'Cliente',
       email: cleanEmail,
       telefono: cleanPhone,
-      notas: notas.trim(),
+      notas: rules.notas.activo ? notas.trim() : '',
       website,
     })
   }
@@ -114,87 +136,124 @@ export function BookingForm({
 
       {/* Campos del formulario */}
       <div className="space-y-4">
+        {/* Nombre y apellidos */}
         <div className="space-y-1.5">
           <label
             htmlFor="booking-name"
-            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
+            className="text-xs font-medium text-zinc-300 flex items-center justify-between"
           >
-            <User className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Nombre y apellidos *</span>
+            <span className="flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Nombre y apellidos</span>
+            </span>
+            <span className={`text-[11px] font-mono ${rules.nombre.requerido ? 'text-amber-400' : 'text-zinc-500'}`}>
+              {rules.nombre.requerido ? '* Obligatorio' : '(opcional)'}
+            </span>
           </label>
           <input
             id="booking-name"
             type="text"
-            required
+            required={rules.nombre.requerido}
             autoComplete="name"
-            placeholder="Ej. Carlos Mendoza"
+            placeholder={rules.nombre.requerido ? 'Ej. Carlos Mendoza' : 'Ej. Carlos (opcional)'}
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
           />
         </div>
 
-        <div className="space-y-1.5">
-          <label
-            htmlFor="booking-email"
-            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
-          >
-            <Mail className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Correo electrónico *</span>
-          </label>
-          <input
-            id="booking-email"
-            type="email"
-            required
-            autoComplete="email"
-            placeholder="ejemplo@correo.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
-          />
-          <p className="text-xs text-zinc-400 pl-1">
-            Enviaremos aquí tu entrada al calendario y el enlace para cambiar o
-            cancelar en 1 clic.
-          </p>
-        </div>
+        {/* Correo electrónico (si está activo) */}
+        {rules.email.activo && (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="booking-email"
+              className="text-xs font-medium text-zinc-300 flex items-center justify-between"
+            >
+              <span className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Correo electrónico</span>
+              </span>
+              <span className={`text-[11px] font-mono ${rules.email.requerido ? 'text-amber-400' : 'text-zinc-500'}`}>
+                {rules.email.requerido ? '* Obligatorio' : '(opcional)'}
+              </span>
+            </label>
+            <input
+              id="booking-email"
+              type="email"
+              required={rules.email.requerido}
+              autoComplete="email"
+              placeholder="ejemplo@correo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+            />
+            <p className="text-[11px] text-zinc-400 pl-1 leading-relaxed">
+              {rules.email.requerido
+                ? 'Enviaremos aquí tu confirmación y el enlace directo para cambiar o cancelar en 1 clic.'
+                : 'Opcional. Si lo introduces recibirás confirmación y enlace para reprogramar/cancelar online.'}
+            </p>
+          </div>
+        )}
 
-        <div className="space-y-1.5">
-          <label
-            htmlFor="booking-phone"
-            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
-          >
-            <Phone className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Teléfono móvil *</span>
-          </label>
-          <input
-            id="booking-phone"
-            type="tel"
-            required
-            autoComplete="tel"
-            placeholder="Ej. +34 600 000 000"
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
-            className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
-          />
-        </div>
+        {/* Teléfono móvil (si está activo) */}
+        {rules.telefono.activo && (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="booking-phone"
+              className="text-xs font-medium text-zinc-300 flex items-center justify-between"
+            >
+              <span className="flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Teléfono móvil</span>
+              </span>
+              <span className={`text-[11px] font-mono ${rules.telefono.requerido ? 'text-amber-400' : 'text-zinc-500'}`}>
+                {rules.telefono.requerido ? '* Obligatorio' : '(opcional)'}
+              </span>
+            </label>
+            <input
+              id="booking-phone"
+              type="tel"
+              required={rules.telefono.requerido}
+              autoComplete="tel"
+              placeholder="Ej. +34 600 000 000"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              className="w-full min-h-12 px-4 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors"
+            />
+            {!rules.telefono.requerido && (
+              <p className="text-[11px] text-zinc-500 pl-1">
+                Opcional. Útil ante avisos o imprevistos de última hora en el local.
+              </p>
+            )}
+          </div>
+        )}
 
-        <div className="space-y-1.5">
-          <label
-            htmlFor="booking-notes"
-            className="text-xs font-medium text-zinc-300 flex items-center gap-1.5"
-          >
-            <FileText className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Notas adicionales (opcional)</span>
-          </label>
-          <textarea
-            id="booking-notes"
-            rows={2}
-            placeholder="¿Algo que debamos saber antes de tu cita?"
-            value={notas}
-            onChange={(e) => setNotas(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors resize-none"
-          />
-        </div>
+        {/* Notas adicionales (si está activo) */}
+        {rules.notas.activo && (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="booking-notes"
+              className="text-xs font-medium text-zinc-300 flex items-center justify-between"
+            >
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Notas adicionales</span>
+              </span>
+              <span className={`text-[11px] font-mono ${rules.notas.requerido ? 'text-amber-400' : 'text-zinc-500'}`}>
+                {rules.notas.requerido ? '* Obligatorio' : '(opcional)'}
+              </span>
+            </label>
+            <textarea
+              id="booking-notes"
+              rows={2}
+              required={rules.notas.requerido}
+              placeholder="¿Algo que debamos saber antes de tu cita?"
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-zinc-900/60 border border-white/10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500/60 transition-colors resize-none"
+            />
+          </div>
+        )}
       </div>
 
       {/* Honeypot anti-bots: invisible para humanos y lectores de pantalla */}

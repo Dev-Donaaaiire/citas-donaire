@@ -1,4 +1,4 @@
-export const CURRENT_SYSTEM_VERSION = '1.3.0'
+export const CURRENT_SYSTEM_VERSION = '1.4.0'
 export const UPSTREAM_GITHUB_REPO = 'Dev-Donaaaiire/citas-donaire'
 export const DEFAULT_VERSION_API_URL =
   process.env.VERSION_API_URL ||

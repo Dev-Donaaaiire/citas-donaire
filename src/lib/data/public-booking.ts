@@ -22,6 +22,7 @@ import {
   sanitizeTimeZone,
   zonedDateTimeToUtc,
 } from '@/lib/timezone'
+import { normalizeFormFields } from '@/lib/form-field-rules'
 
 export interface PublicBookingInitialData {
   services: Service[]
@@ -61,7 +62,7 @@ const fetchPublicBookingInitialData = cache(
         db
           .from('business_settings')
           .select(
-            'id, nombre_negocio, logo_url, horario_apertura, horario_cierre, dias_laborables, duracion_cita_minutos, tema_activo, modo_demo, direccion, telefono_contacto, timezone'
+            'id, nombre_negocio, logo_url, horario_apertura, horario_cierre, dias_laborables, duracion_cita_minutos, tema_activo, modo_demo, direccion, telefono_contacto, timezone, campos_formulario'
           )
           .order('created_at', { ascending: true })
           .limit(1)
@@ -77,6 +78,7 @@ const fetchPublicBookingInitialData = cache(
         settings = {
           ...settingsRes.data,
           timezone: sanitizeTimeZone(settingsRes.data.timezone),
+          campos_formulario: normalizeFormFields(settingsRes.data.campos_formulario),
         }
       }
       services = servicesRes.data ?? []
@@ -111,6 +113,7 @@ const fetchPublicBookingInitialData = cache(
           direccion: first.direccion,
           telefono_contacto: first.telefono_contacto,
           timezone: sanitizeTimeZone(first.timezone),
+          campos_formulario: normalizeFormFields(first.campos_formulario),
         }
       }
       services = servicesRes.data ?? []

@@ -1,8 +1,10 @@
 import 'server-only'
+import crypto from 'node:crypto'
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { checkProductionLicenseGate } from '@/lib/license'
 import { sendBookingConfirmationEmails } from '@/lib/email-service'
+import { normalizeFormFields } from '@/lib/form-field-rules'
 import {
   getZonedDateParts,
   getZonedDayOfWeek,
@@ -72,10 +74,6 @@ export async function createServerBooking(
   input: CreateServerBookingInput
 ): Promise<CreateServerBookingOutcome> {
   const serviceId = input.serviceId?.trim() || ''
-  const nombre = input.nombre?.trim() || ''
-  const email = input.email?.trim().toLowerCase() || ''
-  const telefono = input.telefono?.trim() || ''
-  const notas = input.notas?.trim().slice(0, 500) || null
   const rescheduleToken = input.rescheduleToken?.trim() || null
 
   if (!UUID_REGEX.test(serviceId)) {
@@ -83,30 +81,6 @@ export async function createServerBooking(
       'El servicio seleccionado no es válido.',
       400,
       'INVALID_SERVICE'
-    )
-  }
-
-  if (nombre.length < 2 || nombre.length > 120) {
-    throw new BookingApiError(
-      'Introduce un nombre válido (mínimo 2 caracteres).',
-      400,
-      'INVALID_NAME'
-    )
-  }
-
-  if (!EMAIL_REGEX.test(email) || email.length > 180) {
-    throw new BookingApiError(
-      'Introduce un correo electrónico válido.',
-      400,
-      'INVALID_EMAIL'
-    )
-  }
-
-  if (telefono.length < 6 || telefono.length > 40) {
-    throw new BookingApiError(
-      'Introduce un teléfono de contacto válido.',
-      400,
-      'INVALID_PHONE'
     )
   }
 
@@ -151,6 +125,73 @@ export async function createServerBooking(
       503,
       'BUSINESS_NOT_CONFIGURED'
     )
+  }
+
+  // 2. Personalización de campos del formulario
+  const formRules = normalizeFormFields(settingsRow.campos_formulario)
+
+  let effectiveNombre = input.nombre?.trim() || ''
+  const rawEmail = input.email?.trim().toLowerCase() || ''
+  const rawPhone = input.telefono?.trim() || ''
+  const effectiveNotas = formRules.notas.activo
+    ? input.notas?.trim().slice(0, 500) || null
+    : null
+
+  // Validación de nombre
+  if (formRules.nombre.requerido) {
+    if (effectiveNombre.length < 2 || effectiveNombre.length > 120) {
+      throw new BookingApiError(
+        'Introduce tu nombre completo (mínimo 2 caracteres).',
+        400,
+        'INVALID_NAME'
+      )
+    }
+  } else {
+    if (!effectiveNombre) effectiveNombre = 'Cliente'
+  }
+
+  // Validación de correo electrónico
+  let effectiveEmail: string | null = null
+  if (formRules.email.activo && formRules.email.requerido) {
+    if (!EMAIL_REGEX.test(rawEmail) || rawEmail.length > 180) {
+      throw new BookingApiError(
+        'Introduce un correo electrónico válido para enviarte la confirmación.',
+        400,
+        'INVALID_EMAIL'
+      )
+    }
+    effectiveEmail = rawEmail
+  } else if (rawEmail) {
+    if (!EMAIL_REGEX.test(rawEmail) || rawEmail.length > 180) {
+      throw new BookingApiError(
+        'El correo introducido no tiene un formato válido.',
+        400,
+        'INVALID_EMAIL'
+      )
+    }
+    effectiveEmail = rawEmail
+  }
+
+  // Validación de teléfono
+  let effectivePhone: string | null = null
+  if (formRules.telefono.activo && formRules.telefono.requerido) {
+    if (rawPhone.length < 6 || rawPhone.length > 40) {
+      throw new BookingApiError(
+        'Introduce un número de teléfono de contacto válido.',
+        400,
+        'INVALID_PHONE'
+      )
+    }
+    effectivePhone = rawPhone
+  } else if (rawPhone) {
+    if (rawPhone.length < 6 || rawPhone.length > 40) {
+      throw new BookingApiError(
+        'El teléfono introducido no es válido.',
+        400,
+        'INVALID_PHONE'
+      )
+    }
+    effectivePhone = rawPhone
   }
 
   // Verificar licencia del sistema: previene bypass con modo_demo en producción en dominios reales
@@ -278,55 +319,82 @@ export async function createServerBooking(
   }
 
   // 6. Verificación de bloqueo previo y mutación segura del cliente (sin mutar si bloqueado)
-  const { data: existingClient, error: selectClientErr } = await db
-    .from('clients')
-    .select('*')
-    .eq('email', email)
-    .maybeSingle()
-
-  if (selectClientErr) {
-    throw new BookingApiError(
-      'No se pudo verificar el historial del cliente para la reserva.',
-      500,
-      'CLIENT_VERIFICATION_FAILED'
-    )
-  }
-
-  if (existingClient?.bloqueado_no_show) {
-    const contactPhone = settingsRow.telefono_contacto?.trim()
-    const contactDetail = contactPhone
-      ? ` Contacta directamente al ${contactPhone} para validar tu reserva.`
-      : ' Ponte en contacto directamente con el establecimiento para validar tu reserva.'
-
-    throw new BookingApiError(
-      `No se pudo completar la reserva online para este correo por inasistencias previas sin aviso.${contactDetail}`,
-      403,
-      'CLIENT_BLOCKED'
-    )
-  }
-
   let clientRow: Client
 
-  if (existingClient) {
-    const { data: updatedClient, error: updateClientErr } = await db
+  if (effectiveEmail) {
+    const { data: existingClient, error: selectClientErr } = await db
       .from('clients')
-      .update({ nombre, telefono })
-      .eq('id', existingClient.id)
       .select('*')
-      .single()
+      .eq('email', effectiveEmail)
+      .maybeSingle()
 
-    if (updateClientErr || !updatedClient) {
+    if (selectClientErr) {
       throw new BookingApiError(
-        'No se pudo actualizar los datos del cliente para confirmar la cita.',
+        'No se pudo verificar el historial del cliente para la reserva.',
         500,
-        'CLIENT_UPDATE_FAILED'
+        'CLIENT_VERIFICATION_FAILED'
       )
     }
-    clientRow = updatedClient
+
+    if (existingClient?.bloqueado_no_show) {
+      const contactPhone = settingsRow.telefono_contacto?.trim()
+      const contactDetail = contactPhone
+        ? ` Contacta directamente al ${contactPhone} para validar tu reserva.`
+        : ' Ponte en contacto directamente con el establecimiento para validar tu reserva.'
+
+      throw new BookingApiError(
+        `No se pudo completar la reserva online para este correo por inasistencias previas sin aviso.${contactDetail}`,
+        403,
+        'CLIENT_BLOCKED'
+      )
+    }
+
+    if (existingClient) {
+      const { data: updatedClient, error: updateClientErr } = await db
+        .from('clients')
+        .update({ nombre: effectiveNombre, telefono: effectivePhone })
+        .eq('id', existingClient.id)
+        .select('*')
+        .single()
+
+      if (updateClientErr || !updatedClient) {
+        throw new BookingApiError(
+          'No se pudo actualizar los datos del cliente para confirmar la cita.',
+          500,
+          'CLIENT_UPDATE_FAILED'
+        )
+      }
+      clientRow = updatedClient
+    } else {
+      const { data: insertedClient, error: insertClientErr } = await db
+        .from('clients')
+        .insert({
+          nombre: effectiveNombre,
+          email: effectiveEmail,
+          telefono: effectivePhone,
+        })
+        .select('*')
+        .single()
+
+      if (insertClientErr || !insertedClient) {
+        throw new BookingApiError(
+          'No se pudo registrar al cliente para confirmar la cita.',
+          500,
+          'CLIENT_INSERT_FAILED'
+        )
+      }
+      clientRow = insertedClient
+    }
   } else {
+    // Cliente sin correo electrónico: guardamos identificador seguro que no colisiona
+    const dummyEmail = `no-email-${crypto.randomUUID().slice(0, 8)}@citas.local`
     const { data: insertedClient, error: insertClientErr } = await db
       .from('clients')
-      .insert({ nombre, email, telefono })
+      .insert({
+        nombre: effectiveNombre,
+        email: dummyEmail,
+        telefono: effectivePhone,
+      })
       .select('*')
       .single()
 
@@ -372,7 +440,7 @@ export async function createServerBooking(
       fecha_hora_inicio: startIso,
       fecha_hora_fin: endIso,
       estado: 'confirmada',
-      notas,
+      notas: effectiveNotas,
     })
     .select('*')
     .single()
@@ -450,9 +518,9 @@ export async function createServerBooking(
     servicePrice: Number(serviceRow.precio),
     durationMinutes: serviceRow.duracion_minutos,
     clientName: clientRow.nombre,
-    clientEmail: clientRow.email,
+    clientEmail: effectiveEmail || '',
     clientPhone: clientRow.telefono,
-    notes: notas,
+    notes: effectiveNotas,
     startIso,
     endIso,
     ownerEmail: settingsRow.email_notificaciones,
@@ -478,6 +546,7 @@ export async function createServerBooking(
     direccion: settingsRow.direccion,
     telefono_contacto: settingsRow.telefono_contacto,
     timezone: tz,
+    campos_formulario: formRules,
   }
 
   return {

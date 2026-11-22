@@ -3,6 +3,7 @@ import { requireAdminSession } from '@/lib/admin-auth'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { getAdminSetupData } from '@/lib/data/admin-setup'
 import { sanitizeTimeZone } from '@/lib/timezone'
+import { normalizeFormFields, type FormCustomizationSettings } from '@/lib/form-field-rules'
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
       diasLaborables?: number[]
       temaActivo?: 'dark_luxury' | 'clean_minimal' | 'neon_creator'
       modoDemo?: boolean
+      camposFormulario?: FormCustomizationSettings
       services?: Array<{
         id?: string
         nombre: string
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
         ? body.temaActivo
         : 'dark_luxury'
     const modoDemo = Boolean(body.modoDemo)
+    const camposFormulario = normalizeFormFields(body.camposFormulario)
 
     const validServices = (Array.isArray(body.services) ? body.services : [])
       .map((s) => ({
@@ -99,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Upsert business_settings
-    const settingsPayload = {
+    const settingsPayload: Record<string, unknown> = {
       nombre_negocio: nombreNegocio,
       email_notificaciones: emailNotificaciones,
       direccion,
@@ -111,6 +114,7 @@ export async function POST(request: NextRequest) {
       dias_laborables: diasLaborables,
       tema_activo: temaActivo,
       modo_demo: modoDemo,
+      campos_formulario: camposFormulario,
     }
 
     let savedSettingsId =
@@ -127,23 +131,46 @@ export async function POST(request: NextRequest) {
     }
 
     if (savedSettingsId) {
-      const { error: updateErr } = await db
+      let { error: updateErr } = await db
         .from('business_settings')
-        .update(settingsPayload)
+        .update(settingsPayload as any)
         .eq('id', savedSettingsId)
+
+      // Fallback si la columna campos_formulario aún no existe en alguna base de datos legada
+      if (updateErr && updateErr.message?.includes('campos_formulario')) {
+        const fallbackPayload = { ...settingsPayload }
+        delete fallbackPayload.campos_formulario
+        const fallbackRes = await db
+          .from('business_settings')
+          .update(fallbackPayload as any)
+          .eq('id', savedSettingsId)
+        updateErr = fallbackRes.error
+      }
 
       if (updateErr) {
         throw new Error(updateErr.message)
       }
     } else {
-      const { data: created, error: insertErr } = await db
+      let { data: created, error: insertErr } = await db
         .from('business_settings')
-        .insert(settingsPayload)
+        .insert(settingsPayload as any)
         .select('id')
         .single()
 
-      if (insertErr) {
-        throw new Error(insertErr.message)
+      if (insertErr && insertErr.message?.includes('campos_formulario')) {
+        const fallbackPayload = { ...settingsPayload }
+        delete fallbackPayload.campos_formulario
+        const fallbackRes = await db
+          .from('business_settings')
+          .insert(fallbackPayload as any)
+          .select('id')
+          .single()
+        created = fallbackRes.data
+        insertErr = fallbackRes.error
+      }
+
+      if (insertErr || !created) {
+        throw new Error(insertErr?.message || 'Error al crear la configuración inicial')
       }
       savedSettingsId = created.id
     }

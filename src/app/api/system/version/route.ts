@@ -16,15 +16,15 @@ export async function OPTIONS() {
 
 export async function GET() {
   const versionPayload = {
-    version: '1.3.0',
-    commitHash: 'v1.3.0',
+    version: '1.4.0',
+    commitHash: 'v1.4.0',
     releaseDate: '2026-11-22',
     upstreamRepo: UPSTREAM_GITHUB_REPO,
     changelog: [
-      '🔔 Notificación por correo al cliente al bloquear fechas u horarios con citas confirmadas.',
-      '🔄 Enlace directo de reprogramación en 1 clic sin volver a rellenar datos personales.',
-      '🛡️ Protección contra cancelaciones accidentales con confirmación de seguridad en /cancelar.',
-      '🚀 Asistente de actualización Krono con soporte para Vercel Clone y scripts automáticos.',
+      '⚙️ Personalización del formulario de reserva: elige qué campos son obligatorios, opcionales u ocultos.',
+      '💡 Análisis de impacto en tiempo real: especificación clara de qué funciones se pierden o ganan con cada campo.',
+      '🛡️ Reservas flexibles con compatibilidad universal en base de datos para clientes sin email o teléfono.',
+      '📊 Tabla de retención y agenda adaptadas con indicadores de estado para clientes sin datos de contacto.',
     ],
   }
 

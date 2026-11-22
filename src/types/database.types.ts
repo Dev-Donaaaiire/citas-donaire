@@ -109,10 +109,12 @@ export type Database = {
           telefono_contacto: string | null
           tema_activo: 'dark_luxury' | 'clean_minimal' | 'neon_creator'
           timezone: string
+          campos_formulario?: Json | null
           ultima_restauracion_demo: string | null
           updated_at?: string
         }
         Insert: {
+          campos_formulario?: Json | null
           created_at?: string
           dias_laborables?: Json
           direccion?: string | null
@@ -131,6 +133,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          campos_formulario?: Json | null
           created_at?: string
           dias_laborables?: Json
           direccion?: string | null
@@ -302,6 +305,7 @@ export type Database = {
           telefono_contacto: string | null
           tema_activo: string
           timezone: string
+          campos_formulario?: Json | null
         }[]
       }
       get_public_busy_intervals: {

@@ -25,6 +25,11 @@ import { INITIAL_SUPABASE_SQL_SCRIPT } from '@/lib/initial-sql'
 import type { InitialSetupPayload } from '@/lib/data/admin-setup'
 import { THEMES, type ThemeId } from '@/lib/themes'
 import { normalizeWorkingDays } from '@/lib/timezone'
+import { FormFieldConfigurator } from '@/components/setup/FormFieldConfigurator'
+import {
+  normalizeFormFields,
+  type FormCustomizationSettings,
+} from '@/lib/form-field-rules'
 
 interface EditableService {
   id?: string
@@ -123,6 +128,11 @@ export function SetupContent({
         }))
       : DEFAULT_SERVICES
   )
+
+  const [camposFormulario, setCamposFormulario] =
+    useState<FormCustomizationSettings>(
+      normalizeFormFields(initialSettings?.campos_formulario)
+    )
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveFeedback, setSaveFeedback] = useState<{
@@ -245,6 +255,7 @@ export function SetupContent({
           diasLaborables,
           temaActivo: selectedTheme,
           modoDemo,
+          camposFormulario,
           services,
         }),
       })
@@ -881,6 +892,14 @@ export function SetupContent({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Configuración avanzada de campos del formulario de reserva */}
+          <div className="border-t border-white/10 pt-4">
+            <FormFieldConfigurator
+              value={camposFormulario}
+              onChange={setCamposFormulario}
+            />
           </div>
 
           {saveFeedback && (

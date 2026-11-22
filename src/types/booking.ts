@@ -1,4 +1,7 @@
 import type { Database } from './database.types'
+import type { FormCustomizationSettings } from '@/lib/form-field-rules'
+
+export type { FormCustomizationSettings, FormFieldSetting } from '@/lib/form-field-rules'
 
 export type Service = Database['public']['Tables']['services']['Row']
 export type Client = Database['public']['Tables']['clients']['Row']
@@ -7,7 +10,12 @@ export type Appointment = Database['public']['Tables']['appointments']['Row'] & 
   service?: Service | null
 }
 export type BlockedSlot = Database['public']['Tables']['blocked_slots']['Row']
-export type BusinessSettings = Database['public']['Tables']['business_settings']['Row']
+export type BusinessSettings = Omit<
+  Database['public']['Tables']['business_settings']['Row'],
+  'campos_formulario'
+> & {
+  campos_formulario?: FormCustomizationSettings | null
+}
 
 export interface TimeSlot {
   time: string // "09:00", "09:30"
