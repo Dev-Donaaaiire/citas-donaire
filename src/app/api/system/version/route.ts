@@ -16,15 +16,15 @@ export async function OPTIONS() {
 
 export async function GET() {
   const versionPayload = {
-    version: '1.2.2',
-    commitHash: 'v1.2.2',
-    releaseDate: '2026-11-16',
+    version: '1.3.0',
+    commitHash: 'v1.3.0',
+    releaseDate: '2026-11-22',
     upstreamRepo: UPSTREAM_GITHUB_REPO,
     changelog: [
-      '📋 Nueva guía visual con instrucciones detalladas paso a paso para actualizar.',
-      '✨ Botón de actualización enriquecido con enlace directo a Actions y comprobaciones de seguridad.',
-      '🛡️ Sincronización limpia de archivos de negocio garantizada.',
-      '🏷️ Etiqueta de versión v1.2.2 activa.',
+      '🔔 Notificación por correo al cliente al bloquear fechas u horarios con citas confirmadas.',
+      '🔄 Enlace directo de reprogramación en 1 clic sin volver a rellenar datos personales.',
+      '🛡️ Protección contra cancelaciones accidentales con confirmación de seguridad en /cancelar.',
+      '🚀 Asistente de actualización Krono con soporte para Vercel Clone y scripts automáticos.',
     ],
   }
 

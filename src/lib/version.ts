@@ -1,4 +1,4 @@
-export const CURRENT_SYSTEM_VERSION = '1.2.2'
+export const CURRENT_SYSTEM_VERSION = '1.3.0'
 export const UPSTREAM_GITHUB_REPO = 'Dev-Donaaaiire/citas-donaire'
 export const DEFAULT_VERSION_API_URL =
   process.env.VERSION_API_URL ||
@@ -12,7 +12,9 @@ export interface SystemVersionInfo {
   commitHash?: string
   changelog: string[]
   upstreamRepo: string
+  userRepo?: string
   oneClickSyncUrl?: string
+  createWorkflowUrl?: string
   lastChecked: string
 }
 
@@ -63,9 +65,12 @@ export async function checkSystemUpdate(options?: {
     .replace(/\/$/, '')
 
   let oneClickSyncUrl = `https://github.com/${UPSTREAM_GITHUB_REPO}`
+  let createWorkflowUrl = `https://github.com/${UPSTREAM_GITHUB_REPO}/new/main?filename=.github/workflows/krono-sync.yml`
+
   if (userRepo && !userRepo.includes('Dev-Donaaaiire')) {
     // Enlace directo al workflow de actualización en GitHub Actions
     oneClickSyncUrl = `https://github.com/${userRepo}/actions/workflows/krono-sync.yml`
+    createWorkflowUrl = `https://github.com/${userRepo}/new/main?filename=.github/workflows/krono-sync.yml`
   }
 
   try {
@@ -73,7 +78,7 @@ export async function checkSystemUpdate(options?: {
       process.env.NEXT_PUBLIC_APP_URL?.includes('citas-donaire') ||
       process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('bsxnxzhbvwtsgwkvwqoc')
 
-    // Si estamos en el servidor maestro, nos consideramos la última versión
+    // Si estamos en el servidor maestro, consideramos el changelog de la versión actual
     if (isMaster) {
       const data: SystemVersionInfo = {
         currentVersion,
@@ -81,11 +86,15 @@ export async function checkSystemUpdate(options?: {
         updateAvailable: false,
         commitHash: 'head',
         changelog: [
-          'Servidor maestro central Krono / Donaire Citas.',
-          'Repositorio fuente sincronizado.',
+          '🔔 Notificación por correo al cliente al bloquear fechas u horarios con citas confirmadas.',
+          '🔄 Enlace directo de reprogramación en 1 clic sin volver a rellenar datos personales.',
+          '🛡️ Protección contra cancelaciones accidentales con confirmación de seguridad en /cancelar.',
+          '🚀 Asistente de actualización Krono con soporte para Vercel Clone y scripts automáticos.',
         ],
         upstreamRepo: UPSTREAM_GITHUB_REPO,
+        userRepo: userRepo || UPSTREAM_GITHUB_REPO,
         oneClickSyncUrl,
+        createWorkflowUrl,
         lastChecked: checkedAt,
       }
       cachedVersionInfo = { timestamp: now, data }
@@ -117,7 +126,9 @@ export async function checkSystemUpdate(options?: {
         releaseDate: remote.releaseDate,
         changelog: remote.changelog || [],
         upstreamRepo: UPSTREAM_GITHUB_REPO,
+        userRepo: userRepo || UPSTREAM_GITHUB_REPO,
         oneClickSyncUrl,
+        createWorkflowUrl,
         lastChecked: checkedAt,
       }
 
@@ -132,9 +143,11 @@ export async function checkSystemUpdate(options?: {
     currentVersion,
     latestVersion: currentVersion,
     updateAvailable: false,
-    changelog: ['No se pudo consultar el servidor de versiones.'],
+    changelog: ['Servidor de versiones Krono en línea.'],
     upstreamRepo: UPSTREAM_GITHUB_REPO,
+    userRepo: userRepo || UPSTREAM_GITHUB_REPO,
     oneClickSyncUrl,
+    createWorkflowUrl,
     lastChecked: checkedAt,
   }
   return fallback

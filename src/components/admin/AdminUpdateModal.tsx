@@ -12,9 +12,45 @@ import {
   Zap,
   CheckCircle2,
   Terminal,
+  AlertTriangle,
+  FileCode,
+  Play,
 } from 'lucide-react'
-import type { SystemVersionInfo } from '@/lib/version'
+import {
+  CURRENT_SYSTEM_VERSION,
+  UPSTREAM_GITHUB_REPO,
+  type SystemVersionInfo,
+} from '@/lib/version'
 import { AccessibleModal } from '@/components/ui/AccessibleModal'
+
+const KRONO_SYNC_YML_CONTENT = `name: Krono Auto-Sync & Update
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sincronizar aplicación con Upstream Oficial
+        run: |
+          git config user.name "Krono Updater"
+          git config user.email "bot@citas-donaire.dev"
+          git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git || true
+          git fetch upstream main
+          git checkout upstream/main -- src public package.json package-lock.json next.config.ts tsconfig.json README.md
+          git add -A
+          git commit -m "chore(krono): actualización automática de la aplicación" || echo "Sin cambios nuevos"
+          git push origin main
+`
 
 interface AdminUpdateModalProps {
   isOpen: boolean
@@ -29,11 +65,31 @@ export function AdminUpdateModal({
 }: AdminUpdateModalProps) {
   const titleId = useId()
   const [copiedCmd, setCopiedCmd] = useState(false)
+  const [copiedYml, setCopiedYml] = useState(false)
 
-  if (!versionInfo) return null
+  const activeInfo: SystemVersionInfo = versionInfo || {
+    currentVersion: CURRENT_SYSTEM_VERSION,
+    latestVersion: CURRENT_SYSTEM_VERSION,
+    updateAvailable: false,
+    changelog: [
+      '🔔 Notificación por correo al cliente al bloquear fechas u horarios con citas confirmadas.',
+      '🔄 Enlace directo de reprogramación en 1 clic sin volver a rellenar datos personales.',
+      '🛡️ Protección contra cancelaciones accidentales con confirmación de seguridad en /cancelar.',
+      '🚀 Asistente de actualización Krono con soporte para Vercel Clone y scripts automáticos.',
+    ],
+    upstreamRepo: UPSTREAM_GITHUB_REPO,
+    userRepo: UPSTREAM_GITHUB_REPO,
+    oneClickSyncUrl: `https://github.com/${UPSTREAM_GITHUB_REPO}`,
+    createWorkflowUrl: `https://github.com/${UPSTREAM_GITHUB_REPO}/new/main?filename=.github/workflows/krono-sync.yml`,
+    lastChecked: new Date().toISOString(),
+  }
 
-  const isUpToDate = !versionInfo.updateAvailable
-  const syncUrl = versionInfo.oneClickSyncUrl || 'https://github.com/Dev-Donaaaiire/citas-donaire'
+  const isUpToDate = !activeInfo.updateAvailable
+  const syncUrl =
+    activeInfo.oneClickSyncUrl || `https://github.com/${UPSTREAM_GITHUB_REPO}`
+  const createWorkflowUrl =
+    activeInfo.createWorkflowUrl ||
+    `https://github.com/${activeInfo.userRepo || UPSTREAM_GITHUB_REPO}/new/main?filename=.github/workflows/krono-sync.yml`
 
   const terminalCmd =
     'git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git\ngit pull upstream main --allow-unrelated-histories\ngit push origin main'
@@ -42,6 +98,12 @@ export function AdminUpdateModal({
     navigator.clipboard.writeText(terminalCmd)
     setCopiedCmd(true)
     setTimeout(() => setCopiedCmd(false), 2500)
+  }
+
+  const handleCopyYml = () => {
+    navigator.clipboard.writeText(KRONO_SYNC_YML_CONTENT)
+    setCopiedYml(true)
+    setTimeout(() => setCopiedYml(false), 2500)
   }
 
   return (
@@ -69,10 +131,10 @@ export function AdminUpdateModal({
               >
                 {isUpToDate
                   ? 'Sistema actualizado a la última versión'
-                  : `Nueva versión disponible: v${versionInfo.latestVersion}`}
+                  : `Nueva versión disponible: v${activeInfo.latestVersion}`}
               </h2>
               <p className="text-xs text-zinc-400">
-                Versión instalada: <span className="font-mono text-zinc-300">v{versionInfo.currentVersion}</span>
+                Versión instalada: <span className="font-mono text-zinc-300">v{activeInfo.currentVersion}</span>
               </p>
             </div>
           </div>
@@ -95,8 +157,8 @@ export function AdminUpdateModal({
               Novedades de esta versión
             </h3>
             <div className="p-3.5 rounded-xl bg-zinc-950/70 border border-white/10 space-y-2 text-xs text-zinc-300">
-              {versionInfo.changelog && versionInfo.changelog.length > 0 ? (
-                versionInfo.changelog.map((item, idx) => (
+              {activeInfo.changelog && activeInfo.changelog.length > 0 ? (
+                activeInfo.changelog.map((item, idx) => (
                   <div key={idx} className="flex items-start gap-2">
                     <span className="text-emerald-400 shrink-0 font-bold">•</span>
                     <span className="leading-relaxed">{item}</span>
@@ -108,11 +170,60 @@ export function AdminUpdateModal({
             </div>
           </div>
 
+          {/* Tarjeta de solución: Si no tienes krono-sync.yml por clon de Vercel */}
+          <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-xs font-semibold text-amber-200">
+                  ¿Falta el archivo krono-sync.yml en tu GitHub?
+                </span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono font-medium">
+                Vercel Deploy
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-200/80 leading-relaxed">
+              Al desplegar con el botón de Vercel, la API de GitHub omite los flujos dentro de <code className="px-1 py-0.5 rounded bg-zinc-800 font-mono text-zinc-300">.github/workflows/</code> por restricciones de permisos OAuth. Puedes habilitarlo en 15 segundos:
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleCopyYml}
+                className="flex-1 min-h-10 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors active:scale-95"
+              >
+                {copiedYml ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-300 font-semibold">¡YAML Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>1. Copiar código de krono-sync.yml</span>
+                  </>
+                )}
+              </button>
+              <a
+                href={createWorkflowUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 min-h-10 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+              >
+                <span>2. Crear archivo en GitHub</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+            <p className="text-[10px] text-zinc-400">
+              Pulsa el botón amarillo, pega el código copiado y haz clic en «Commit changes». Una vez guardado, ya tendrás la pestaña Actions activa para siempre.
+            </p>
+          </div>
+
           {/* Cómo actualizar */}
           <div className="space-y-2.5 pt-2">
             <h3 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
               <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
-              Cómo aplicar la actualización
+              Opciones para aplicar la actualización
             </h3>
 
             {/* Opción 1: Enlace directo en 1 clic con guía visual paso a paso */}
@@ -179,7 +290,7 @@ export function AdminUpdateModal({
                 rel="noopener noreferrer"
                 className="w-full min-h-12 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]"
               >
-                <span>1. Abrir GitHub y Actualizar</span>
+                <span>Abrir GitHub Actions y Actualizar</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
 
@@ -188,12 +299,27 @@ export function AdminUpdateModal({
               </p>
             </div>
 
-            {/* Opción 2: Terminal rápido */}
+            {/* Opción 2: Script directo incluido */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-white/10 space-y-2">
+              <span className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <Play className="w-4 h-4 text-emerald-400" />
+                Opción 2: Script directo incluido (en tu ordenador)
+              </span>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                El proyecto incluye un script directo. En la carpeta de tu repositorio ejecuta:
+              </p>
+              <div className="p-2.5 rounded-lg bg-zinc-950 border border-white/5 font-mono text-[11px] space-y-1">
+                <div className="text-zinc-300">Windows: <code className="text-emerald-400">scripts\actualizar.bat</code> (o doble clic)</div>
+                <div className="text-zinc-300">Mac / Linux: <code className="text-emerald-400">bash scripts/actualizar.sh</code></div>
+              </div>
+            </div>
+
+            {/* Opción 3: Terminal manual */}
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-white/10 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
                   <Terminal className="w-4 h-4 text-zinc-400" />
-                  Opción 2: Desde la terminal de tu proyecto
+                  Opción 3: Comandos Git manuales en terminal
                 </span>
                 <button
                   type="button"

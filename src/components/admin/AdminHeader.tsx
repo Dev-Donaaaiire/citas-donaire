@@ -23,6 +23,8 @@ import { useIsDemo } from '@/lib/use-is-demo'
 import { useFeedback } from '@/components/ui/FeedbackProvider'
 import { cn } from '@/lib/utils'
 import { InstallAppModal } from '@/components/admin/InstallAppModal'
+import { AdminUpdateModal } from '@/components/admin/AdminUpdateModal'
+import { CURRENT_SYSTEM_VERSION, type SystemVersionInfo } from '@/lib/version'
 
 interface AdminHeaderProps {
   settings: BusinessSettings | null
@@ -47,8 +49,29 @@ export function AdminHeader({
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isTogglingMode, setIsTogglingMode] = useState(false)
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false)
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
+  const [versionInfo, setVersionInfo] = useState<SystemVersionInfo | null>(null)
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadVersion() {
+      try {
+        const res = await fetch('/api/admin/system/status')
+        if (res.ok) {
+          const data = (await res.json()) as SystemVersionInfo
+          if (isMounted) setVersionInfo(data)
+        }
+      } catch {
+        // Silencioso
+      }
+    }
+    void loadVersion()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const handleToggleDemoMode = async () => {
     if (isDemoRoute) return
@@ -238,9 +261,29 @@ export function AdminHeader({
             </div>
             <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-mono truncate">
               <span>Gestión de Agenda &amp; Retención · {settings?.timezone || 'Europe/Madrid'}</span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                v1.2.2
-              </span>
+              <button
+                type="button"
+                onClick={() => setIsUpdateModalOpen(true)}
+                title="Ver estado de versiones y actualizaciones"
+                className={cn(
+                  'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border transition-all active:scale-95 cursor-pointer',
+                  versionInfo?.updateAvailable
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 animate-pulse'
+                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                )}
+              >
+                <Sparkles className="w-2.5 h-2.5 shrink-0" />
+                <span>v{CURRENT_SYSTEM_VERSION}</span>
+                {versionInfo?.updateAvailable ? (
+                  <span className="text-[9px] font-bold text-amber-200">
+                    (Update!)
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-zinc-400 hidden sm:inline">
+                    · Updates
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -307,6 +350,16 @@ export function AdminHeader({
             </Link>
           )}
 
+          <button
+            type="button"
+            onClick={() => setIsUpdateModalOpen(true)}
+            title="Abrir asistente de versiones y actualizaciones"
+            className="min-h-12 px-3 rounded-xl bg-zinc-900 border border-white/10 hover:border-emerald-500/30 text-zinc-300 hover:text-white transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="hidden lg:inline">Actualizaciones</span>
+          </button>
+
           <Link
             href={bookingUrlPath}
             aria-label="Abrir vista pública de reservas"
@@ -339,6 +392,12 @@ export function AdminHeader({
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
         businessName={settings?.nombre_negocio || 'tu local'}
+      />
+
+      <AdminUpdateModal
+        isOpen={isUpdateModalOpen}
+        versionInfo={versionInfo}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
     </header>
   )
