@@ -52,6 +52,8 @@ jobs:
           git push origin main
 `
 
+const WORKFLOW_FILE_PATH = '.github/workflows/krono-sync.yml'
+
 interface AdminUpdateModalProps {
   isOpen: boolean
   versionInfo: SystemVersionInfo | null
@@ -66,6 +68,8 @@ export function AdminUpdateModal({
   const titleId = useId()
   const [copiedCmd, setCopiedCmd] = useState(false)
   const [copiedYml, setCopiedYml] = useState(false)
+  const [copiedPath, setCopiedPath] = useState(false)
+  const [showCodePreview, setShowCodePreview] = useState(false)
 
   const activeInfo: SystemVersionInfo = versionInfo || {
     currentVersion: CURRENT_SYSTEM_VERSION,
@@ -104,6 +108,12 @@ export function AdminUpdateModal({
     navigator.clipboard.writeText(KRONO_SYNC_YML_CONTENT)
     setCopiedYml(true)
     setTimeout(() => setCopiedYml(false), 2500)
+  }
+
+  const handleCopyPath = () => {
+    navigator.clipboard.writeText(WORKFLOW_FILE_PATH)
+    setCopiedPath(true)
+    setTimeout(() => setCopiedPath(false), 2500)
   }
 
   return (
@@ -171,51 +181,163 @@ export function AdminUpdateModal({
           </div>
 
           {/* Tarjeta de solución: Si no tienes krono-sync.yml por clon de Vercel */}
-          <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-3">
+          <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                 <span className="text-xs font-semibold text-amber-200">
-                  ¿Falta el archivo krono-sync.yml en tu GitHub?
+                  ¿No te aparece la opción de actualizar en GitHub?
                 </span>
               </div>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono font-medium">
                 Vercel Deploy
               </span>
             </div>
+
             <p className="text-[11px] text-amber-200/80 leading-relaxed">
-              Al desplegar con el botón de Vercel, la API de GitHub omite los flujos dentro de <code className="px-1 py-0.5 rounded bg-zinc-800 font-mono text-zinc-300">.github/workflows/</code> por restricciones de permisos OAuth. Puedes habilitarlo en 15 segundos:
+              Al desplegar la plantilla con el botón «Deploy with Vercel», GitHub omite los archivos dentro de <code className="px-1 py-0.5 rounded bg-zinc-800 font-mono text-zinc-300">.github/workflows/</code> por permisos de seguridad OAuth. Para habilitar las actualizaciones en 1 clic para siempre en tu repositorio, solo debes crear este archivo una única vez:
             </p>
-            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+
+            {/* Ruta exacta del archivo con botón de copiar */}
+            <div className="p-2.5 rounded-lg bg-zinc-950/90 border border-amber-500/20 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileCode className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-[10px] text-zinc-400 shrink-0 font-medium">Ruta del archivo:</span>
+                <code className="text-[11px] font-mono text-amber-200 truncate select-all">
+                  {WORKFLOW_FILE_PATH}
+                </code>
+              </div>
               <button
                 type="button"
-                onClick={handleCopyYml}
-                className="flex-1 min-h-10 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors active:scale-95"
+                onClick={handleCopyPath}
+                className="shrink-0 inline-flex items-center gap-1 text-[10px] text-zinc-300 hover:text-white px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-white/10 active:scale-95 transition-all"
+                title="Copiar ruta exacta"
               >
-                {copiedYml ? (
+                {copiedPath ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-300 font-semibold">¡YAML Copiado!</span>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-300">Copiada</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>1. Copiar código de krono-sync.yml</span>
+                    <Copy className="w-3 h-3" />
+                    <span>Copiar ruta</span>
                   </>
                 )}
               </button>
-              <a
-                href={createWorkflowUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 min-h-10 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-95"
-              >
-                <span>2. Crear archivo en GitHub</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
             </div>
-            <p className="text-[10px] text-zinc-400">
-              Pulsa el botón amarillo, pega el código copiado y haz clic en «Commit changes». Una vez guardado, ya tendrás la pestaña Actions activa para siempre.
+
+            {/* Pasos guiados 1 - 2 - 3 */}
+            <div className="space-y-2 text-xs">
+              {/* Paso 1: Copiar código */}
+              <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-zinc-900/60 border border-white/5">
+                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center shrink-0 text-[11px] mt-0.5">
+                  1
+                </span>
+                <div className="space-y-1.5 w-full">
+                  <p className="font-medium text-zinc-200 text-xs">
+                    Copia el código YAML de actualización
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCopyYml}
+                    className="w-full min-h-10 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors active:scale-95 border border-white/10"
+                  >
+                    {copiedYml ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-300 font-semibold">¡Código copiado al portapapeles!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-amber-400" />
+                        <span>Copiar código completo de krono-sync.yml</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Paso 2: Crear archivo en GitHub */}
+              <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-zinc-900/60 border border-white/5">
+                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center shrink-0 text-[11px] mt-0.5">
+                  2
+                </span>
+                <div className="space-y-1.5 w-full">
+                  <p className="font-medium text-zinc-200 text-xs">
+                    Abre tu GitHub (ruta precargada automáticamente)
+                  </p>
+                  <a
+                    href={createWorkflowUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full min-h-10 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors active:scale-95 shadow-sm"
+                  >
+                    <span>Crear archivo en GitHub</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Paso 3: Pegar y guardar */}
+              <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-zinc-900/60 border border-white/5">
+                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center shrink-0 text-[11px] mt-0.5">
+                  3
+                </span>
+                <div className="space-y-1">
+                  <p className="font-medium text-zinc-200 text-xs">
+                    Pega el código y pulsa «Commit changes»
+                  </p>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    Pega en el editor de GitHub el contenido copiado en el Paso 1 y haz clic en el botón verde superior <strong className="text-zinc-200">«Commit changes...»</strong> para guardarlo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Inspección / Vista previa del código YAML */}
+            <div className="border border-white/10 rounded-lg overflow-hidden bg-zinc-950">
+              <button
+                type="button"
+                onClick={() => setShowCodePreview(!showCodePreview)}
+                className="w-full px-3 py-2 flex items-center justify-between text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/80 transition-colors"
+              >
+                <span className="flex items-center gap-1.5 font-mono">
+                  <FileCode className="w-3.5 h-3.5 text-amber-400" />
+                  {showCodePreview ? 'Ocultar código YAML' : 'Ver código YAML de krono-sync.yml'}
+                </span>
+                <span className="text-[10px] text-zinc-500">
+                  {showCodePreview ? '▲ Plegar' : '▼ Desplegar'}
+                </span>
+              </button>
+              {showCodePreview && (
+                <div className="relative">
+                  <pre className="p-3 font-mono text-[10px] text-zinc-300 leading-relaxed overflow-x-auto max-h-56 overflow-y-auto bg-zinc-950/90">
+                    {KRONO_SYNC_YML_CONTENT}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={handleCopyYml}
+                    className="absolute top-2 right-2 px-2 py-1 rounded bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 text-[10px] font-medium border border-white/10 flex items-center gap-1 shadow"
+                  >
+                    {copiedYml ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span>Copiado</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copiar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[10px] text-zinc-400 leading-relaxed">
+              💡 Una vez guardado, ya tendrás la pestaña <strong className="text-zinc-300">Actions</strong> habilitada para siempre en tu repositorio, y podrás aplicar todas las actualizaciones de Krono con el botón verde inferior en 1 clic.
             </p>
           </div>
 
