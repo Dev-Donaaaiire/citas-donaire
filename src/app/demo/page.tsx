@@ -35,6 +35,7 @@ async function DemoReservarLoader({ searchParams }: DemoClientPageProps) {
 
   return (
     <ReservarContent
+      key={rescheduleToken || 'demo-booking'}
       initialData={initialData}
       rescheduleToken={rescheduleToken}
       initialServiceId={initialServiceId}

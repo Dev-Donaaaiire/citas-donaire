@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -94,7 +94,9 @@ export function ReservarContent({
     return bookingData.services[0] || null
   }, [bookingData.services, initialServiceId])
 
-  const [step, setStep] = useState<BookingStep>(1)
+  const [step, setStep] = useState<BookingStep>(() =>
+    rescheduleToken ? 2 : 1
+  )
   const [selectedServiceState, setSelectedService] = useState<Service | null>(
     preselectedService
   )
@@ -104,6 +106,20 @@ export function ReservarContent({
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
   const [confirmationDetails, setConfirmationDetails] =
     useState<BookingConfirmationDetails | null>(null)
+
+  useEffect(() => {
+    if (rescheduleToken) {
+      setConfirmationDetails(null)
+      setSelectedSlot(null)
+      setSubmitError(null)
+      setEmailStatus('idle')
+      if (initialServiceId) {
+        const found = bookingData.services.find((s) => s.id === initialServiceId)
+        if (found) setSelectedService(found)
+      }
+      setStep(2)
+    }
+  }, [rescheduleToken, initialServiceId, bookingData.services])
 
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)

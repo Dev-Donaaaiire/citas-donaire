@@ -25,6 +25,7 @@ async function CancelarLoader({ searchParams }: CancelarPageProps) {
 
   return (
     <CancelarContent
+      key={token || 'empty'}
       token={token}
       initialAppointment={appointment}
       initialError={error}

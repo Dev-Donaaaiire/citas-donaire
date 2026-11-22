@@ -883,3 +883,219 @@ export async function sendLicenseDeliveryEmail(input: {
     setupGuideUrl,
   }
 }
+
+export interface AppointmentRescheduleNoticeInput {
+  clientName: string
+  clientEmail: string
+  businessName: string
+  businessAddress?: string | null
+  businessPhone?: string | null
+  timezone?: string | null
+  serviceName: string
+  startIso: string
+  endIso: string
+  rescheduleUrl: string
+  cancelUrl: string
+  motivo?: string | null
+  ownerEmail?: string | null
+}
+
+export function buildAppointmentRescheduleNoticeEmailHtml(params: {
+  clientName: string
+  businessName: string
+  businessAddress?: string | null
+  businessPhone?: string | null
+  timezone?: string | null
+  serviceName: string
+  startIso: string
+  endIso: string
+  rescheduleUrl: string
+  cancelUrl: string
+  motivo?: string | null
+}): string {
+  const dateLabel = formatDateSpanish(params.startIso, params.timezone)
+  const timeRange = `${formatTimeSpanish(params.startIso, params.timezone)} - ${formatTimeSpanish(params.endIso, params.timezone)}`
+  const cleanPhone = params.businessPhone?.trim()
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#f4f4f5;">
+      Hola <strong style="color:#ffffff;">${escapeHtml(params.clientName)}</strong>,
+    </p>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#d4d4d8;">
+      Te informamos de que debido a una indisponibilidad o ajuste en la agenda${
+        params.motivo ? ` (<em>${escapeHtml(params.motivo)}</em>)` : ''
+      }, no podremos atender tu cita prevista en <strong style="color:#ffffff;">${escapeHtml(
+        params.businessName
+      )}</strong>.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#09090b;border:1px solid #27272a;border-radius:12px;margin-bottom:22px;">
+      <tr>
+        <td style="padding:16px 20px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;line-height:1.6;">
+            <tr>
+              <td style="padding:4px 0;color:#a1a1aa;width:120px;">Servicio</td>
+              <td style="padding:4px 0;color:#ffffff;font-weight:600;">${escapeHtml(params.serviceName)}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#a1a1aa;">Fecha afectada</td>
+              <td style="padding:4px 0;color:#ffffff;text-transform:capitalize;">${escapeHtml(dateLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding:4px 0;color:#a1a1aa;">Horario original</td>
+              <td style="padding:4px 0;color:#f59e0b;font-weight:700;font-family:monospace;">${escapeHtml(timeRange)}</td>
+            </tr>
+            ${
+              cleanPhone
+                ? `<tr>
+              <td style="padding:4px 0;color:#a1a1aa;">Contacto</td>
+              <td style="padding:4px 0;color:#e4e4e7;">${escapeHtml(cleanPhone)}</td>
+            </tr>`
+                : ''
+            }
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <div style="padding:14px 16px;border-radius:10px;background-color:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.28);margin-bottom:22px;">
+      <p style="margin:0;font-size:13px;line-height:1.5;color:#e6fcf5;">
+        ⚡ <strong>Reprograma en 1 solo clic:</strong> Tus datos ya están guardados. Pulsa en el botón verde inferior para elegir el nuevo día y hora que mejor te venga sin coste alguno.
+      </p>
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center" style="padding-bottom:10px;">
+          <a href="${escapeHtml(params.rescheduleUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;box-sizing:border-box;text-align:center;padding:14px 22px;border-radius:10px;background-color:#10b981;color:#09090b;font-size:14px;font-weight:700;text-decoration:none;">
+            🔄 Elegir nueva fecha y hora
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td align="center">
+          <a href="${escapeHtml(params.cancelUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;width:100%;box-sizing:border-box;text-align:center;padding:12px 20px;border-radius:10px;background-color:#18181b;border:1px solid #3f3f46;color:#f4f4f5;font-size:13px;font-weight:600;text-decoration:none;">
+            Anular cita definitivamente
+          </a>
+        </td>
+      </tr>
+    </table>
+  `
+
+  return renderEmailShell({
+    preheader: `Aviso importante: necesitamos reprogramar tu cita de ${params.serviceName} del ${dateLabel}. Elige tu nuevo horario en 1 clic.`,
+    badge: 'Aviso de Agenda · Reprogramar',
+    title: 'Aviso de reprogramación',
+    subtitle: `${params.businessName} · Cambio en la disponibilidad de agenda`,
+    bodyHtml,
+    footerNote: `Disculpa las molestias ocasionadas. Si tienes cualquier consulta, contacta con ${params.businessName}.`,
+  })
+}
+
+/**
+ * Notifica a un cliente cuando el dueño bloquea el tramo horario de su cita confirmada.
+ */
+export async function sendAppointmentRescheduleNoticeEmail(
+  input: AppointmentRescheduleNoticeInput
+) {
+  const dateLabel = formatDateSpanish(input.startIso, input.timezone)
+  const clientHtml = buildAppointmentRescheduleNoticeEmailHtml(input)
+
+  const resend = getResendClient()
+  if (!resend) {
+    return {
+      success: true,
+      simulated: true,
+      reason: 'missing_resend_api_key',
+    }
+  }
+
+  const emailJobs = [
+    resend.emails.send({
+      from: DEFAULT_FROM,
+      to: input.clientEmail,
+      subject: `Aviso importante: Necesitamos reprogramar tu cita · ${input.businessName}`,
+      html: clientHtml,
+    }),
+  ]
+
+  const cleanOwnerEmail =
+    input.ownerEmail && !input.ownerEmail.includes('donairecitas.pro')
+      ? input.ownerEmail.trim()
+      : null
+  const ownerEmail =
+    cleanOwnerEmail ||
+    process.env.OWNER_NOTIFICATION_EMAIL?.trim() ||
+    '[correo eliminado]'
+
+  if (ownerEmail) {
+    const ownerNoticeHtml = renderEmailShell({
+      preheader: `Se ha notificado a ${input.clientName} para reprogramar su cita del ${dateLabel}.`,
+      badge: 'Panel Dueño · Cita Afectada',
+      title: 'Cliente notificado para reprogramar',
+      subtitle: `${input.businessName} · Bloqueo de agenda`,
+      bodyHtml: `
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#d4d4d8;">
+          Has bloqueado un tramo horario que coincidía con la cita confirmada de <strong style="color:#ffffff;">${escapeHtml(
+            input.clientName
+          )}</strong> (<a href="mailto:${escapeHtml(
+        input.clientEmail
+      )}" style="color:#34d399;">${escapeHtml(input.clientEmail)}</a>).
+        </p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#d4d4d8;">
+          <strong>Servicio:</strong> ${escapeHtml(input.serviceName)}<br/>
+          <strong>Fecha original:</strong> ${escapeHtml(dateLabel)}
+        </p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#a1a1aa;">
+          Se le ha enviado un correo automático con su enlace exclusivo de reprogramación para que pueda seleccionar otra fecha disponible sin causarle fricción.
+        </p>
+      `,
+      footerNote: `${input.businessName} · Notificación automática de agenda`,
+    })
+
+    emailJobs.push(
+      resend.emails.send({
+        from: DEFAULT_FROM,
+        to: ownerEmail,
+        subject: `[Aviso] Notificado cambio de cita a ${input.clientName} por bloqueo de agenda`,
+        html: ownerNoticeHtml,
+      })
+    )
+  }
+
+  const results = await Promise.allSettled(emailJobs)
+  const errors = results
+    .map((r) => {
+      if (r.status === 'rejected') return String(r.reason)
+      if (r.value.error) return r.value.error.message
+      return null
+    })
+    .filter((e): e is string => Boolean(e))
+
+  if (errors.length === results.length && errors.every(isResendSandboxOrDomainError)) {
+    const fallbackJobs = [
+      resend.emails.send({
+        from: 'Krono Citas <onboarding@resend.dev>',
+        to: input.clientEmail,
+        subject: `Aviso importante: Necesitamos reprogramar tu cita · ${input.businessName}`,
+        html: clientHtml,
+      }),
+    ]
+    if (ownerEmail) {
+      fallbackJobs.push(
+        resend.emails.send({
+          from: 'Krono Citas <onboarding@resend.dev>',
+          to: ownerEmail,
+          subject: `[Aviso] Notificado cambio de cita a ${input.clientName} por bloqueo de agenda`,
+          html: clientHtml,
+        })
+      )
+    }
+    const fallbackResults = await Promise.allSettled(fallbackJobs)
+    const anySuccess = fallbackResults.some((r) => r.status === 'fulfilled' && !r.value.error)
+    return { success: anySuccess, simulated: false }
+  }
+
+  const anySuccess = results.some((r) => r.status === 'fulfilled' && !r.value.error)
+  return { success: anySuccess, simulated: false }
+}

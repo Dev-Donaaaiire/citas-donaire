@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
@@ -43,6 +43,15 @@ export function CancelarContent({
   const [cancelledSuccess, setCancelledSuccess] = useState(
     initialAppointment?.estado === 'cancelada'
   )
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+
+  useEffect(() => {
+    setAppointment(initialAppointment)
+    setErrorMsg(initialError)
+    setCancelledSuccess(initialAppointment?.estado === 'cancelada')
+    setIsCancelling(false)
+    setShowCancelConfirm(false)
+  }, [token, initialAppointment, initialError])
 
   const handleConfirmCancel = async () => {
     if (!appointment || !token) return
@@ -232,31 +241,57 @@ export function CancelarContent({
                   </div>
                 </div>
 
-                {/* Botones de acción sin cancelación prematura */}
-                <div className="space-y-2.5 pt-2">
+                {/* Botones de acción claros y sin cancelación accidental */}
+                <div className="space-y-3 pt-2">
                   <Link
                     href={`/reservar?rescheduleToken=${encodeURIComponent(token)}&serviceId=${encodeURIComponent(appointment.service_id)}`}
-                    className="w-full min-h-12 px-5 rounded-xl bg-emerald-500 text-zinc-950 font-semibold text-sm hover:bg-emerald-400 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    className="w-full min-h-12 px-5 rounded-xl bg-emerald-500 text-zinc-950 font-semibold text-sm hover:bg-emerald-400 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10"
                   >
                     <CalendarPlus className="w-4 h-4" />
                     <span>Cambiar cita / Elegir otro horario</span>
                   </Link>
 
-                  <button
-                    type="button"
-                    disabled={isCancelling}
-                    onClick={handleConfirmCancel}
-                    className="w-full min-h-12 px-5 rounded-xl ui-btn-danger font-medium text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isCancelling ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Cancelando cita...</span>
-                      </>
-                    ) : (
-                      <span>Sí, confirmar anulación</span>
-                    )}
-                  </button>
+                  {!showCancelConfirm ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelConfirm(true)}
+                      className="w-full min-h-12 px-5 rounded-xl bg-zinc-900/60 border border-red-500/30 text-red-400 hover:bg-red-950/20 hover:border-red-500/50 font-medium text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      <span>Anular esta reserva</span>
+                    </button>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-red-950/30 border border-red-500/40 space-y-3">
+                      <p className="text-xs text-red-200 leading-relaxed font-medium">
+                        ¿Confirmas que deseas anular tu cita? Tu horario se liberará de inmediato.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={isCancelling}
+                          onClick={handleConfirmCancel}
+                          className="flex-1 min-h-11 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {isCancelling ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Anulando...</span>
+                            </>
+                          ) : (
+                            <span>Sí, anular definitivamente</span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isCancelling}
+                          onClick={() => setShowCancelConfirm(false)}
+                          className="min-h-11 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+                        >
+                          Volver
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}

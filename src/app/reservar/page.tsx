@@ -52,6 +52,7 @@ async function ReservarLoader({ searchParams }: ReservarPageProps) {
 
   return (
     <ReservarContent
+      key={rescheduleToken || 'new-booking'}
       initialData={initialData}
       rescheduleToken={rescheduleToken}
       initialServiceId={initialServiceId}

@@ -24,6 +24,7 @@ import {
   sanitizeTimeZone,
   zonedDateTimeToUtc,
 } from '@/lib/timezone'
+import { sendAppointmentRescheduleNoticeEmail } from '@/lib/email-service'
 
 export interface ExecutiveMetrics {
   todayAppointmentsCount: number
@@ -464,7 +465,8 @@ export async function createBlockedSlotServer(params: {
   fechaInicio: string
   fechaFin: string
   motivo?: string
-}): Promise<BlockedSlot> {
+  baseUrl?: string
+}): Promise<BlockedSlot & { affectedCount?: number }> {
   const start = new Date(params.fechaInicio)
   const end = new Date(params.fechaFin)
   if (
@@ -490,7 +492,107 @@ export async function createBlockedSlotServer(params: {
     throw new Error(`Error al crear bloqueo: ${error?.message || 'desconocido'}`)
   }
 
-  return data
+  // Buscar citas confirmadas que coincidan con este tramo bloqueado para avisar al cliente
+  let affectedCount = 0
+  try {
+    const { data: overlappingAppointments, error: fetchErr } = await db
+      .from('appointments')
+      .select(`
+        id,
+        fecha_hora_inicio,
+        fecha_hora_fin,
+        token_cancelacion,
+        service_id,
+        client_id,
+        services (
+          id,
+          nombre,
+          precio,
+          duracion_minutos
+        ),
+        clients (
+          id,
+          nombre,
+          email,
+          telefono
+        )
+      `)
+      .eq('estado', 'confirmada')
+      .lt('fecha_hora_inicio', end.toISOString())
+      .gt('fecha_hora_fin', start.toISOString())
+
+    if (!fetchErr && overlappingAppointments && overlappingAppointments.length > 0) {
+      const { data: settingsRow } = await db
+        .from('business_settings')
+        .select('nombre_negocio, email_notificaciones, timezone, direccion, telefono_contacto')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      const cleanBaseUrl = (
+        params.baseUrl ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        'https://citas.donaire.dev'
+      ).replace(/\/$/, '')
+
+      for (const appt of overlappingAppointments) {
+        const client = appt.clients as unknown as {
+          nombre: string
+          email: string
+          telefono?: string
+        } | null
+        const service = appt.services as unknown as {
+          id: string
+          nombre: string
+          precio: number
+          duracion_minutos: number
+        } | null
+
+        if (!client?.email) continue
+
+        affectedCount += 1
+        const rescheduleUrl = `${cleanBaseUrl}/reservar?rescheduleToken=${encodeURIComponent(
+          appt.token_cancelacion
+        )}&serviceId=${encodeURIComponent(appt.service_id)}`
+        const cancelUrl = `${cleanBaseUrl}/cancelar?token=${encodeURIComponent(
+          appt.token_cancelacion
+        )}`
+
+        try {
+          await sendAppointmentRescheduleNoticeEmail({
+            clientName: client.nombre,
+            clientEmail: client.email,
+            businessName: settingsRow?.nombre_negocio || 'Krono Studio',
+            businessAddress: settingsRow?.direccion,
+            businessPhone: settingsRow?.telefono_contacto,
+            timezone: settingsRow?.timezone,
+            serviceName: service?.nombre || 'Servicio',
+            startIso: appt.fecha_hora_inicio,
+            endIso: appt.fecha_hora_fin,
+            rescheduleUrl,
+            cancelUrl,
+            motivo: params.motivo,
+            ownerEmail: settingsRow?.email_notificaciones,
+          })
+        } catch (emailErr) {
+          console.error(
+            '[createBlockedSlotServer] Error enviando email de reprogramación al cliente:',
+            emailErr
+          )
+        }
+      }
+    }
+  } catch (notifyErr) {
+    console.error(
+      '[createBlockedSlotServer] Error en proceso de aviso de reprogramación:',
+      notifyErr
+    )
+  }
+
+  return {
+    ...data,
+    affectedCount,
+  }
 }
 
 export async function deleteBlockedSlotServer(id: string) {

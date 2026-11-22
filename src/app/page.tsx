@@ -94,6 +94,7 @@ async function HomeBookingLoader({ searchParams }: HomePageProps) {
 
   return (
     <ReservarContent
+      key={rescheduleToken || 'new-booking'}
       initialData={initialData}
       rescheduleToken={rescheduleToken}
       initialServiceId={initialServiceId}

@@ -21,13 +21,22 @@ export async function POST(request: NextRequest) {
       motivo?: string
     }
 
+    const baseUrl =
+      request.nextUrl.origin ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      'https://citas.donaire.dev'
+
     const slot = await createBlockedSlotServer({
       fechaInicio: typeof body.fechaInicio === 'string' ? body.fechaInicio : '',
       fechaFin: typeof body.fechaFin === 'string' ? body.fechaFin : '',
       motivo: typeof body.motivo === 'string' ? body.motivo : undefined,
+      baseUrl,
     })
 
-    return NextResponse.json({ blockedSlot: slot }, { status: 201 })
+    return NextResponse.json({
+      blockedSlot: slot,
+      affectedAppointmentsCount: slot.affectedCount || 0,
+    }, { status: 201 })
   } catch (err) {
     console.error('[api/admin/blocked-slots][POST] Error:', err)
     return NextResponse.json(

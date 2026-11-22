@@ -62,10 +62,14 @@ export function AdminBlockSlotModal({
         isDemo,
       })
 
+      const affected = result.affectedAppointmentsCount || 0
       notify({
-        type: 'success',
-        title: 'Tramo bloqueado',
-        description: `Horario bloqueado correctamente para el ${date}.`,
+        type: affected > 0 ? 'info' : 'success',
+        title: affected > 0 ? 'Tramo bloqueado y clientes avisados' : 'Tramo bloqueado',
+        description:
+          affected > 0
+            ? `Horario bloqueado. Se ha enviado un correo a ${affected} cliente(s) con enlace directo para cambiar su cita.`
+            : `Horario bloqueado correctamente para el ${date}.`,
       })
       onSuccess(result.blockedSlot)
       onClose()

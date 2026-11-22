@@ -138,7 +138,11 @@ export async function createBlockedSlot({
   fechaFin: string
   motivo?: string
   isDemo?: boolean
-}): Promise<{ blockedSlot: BlockedSlot; sandbox?: boolean }> {
+}): Promise<{
+  blockedSlot: BlockedSlot
+  affectedAppointmentsCount?: number
+  sandbox?: boolean
+}> {
   const endpoint = isDemo ? '/api/demo/blocked-slots' : '/api/admin/blocked-slots'
   const res = await fetch(endpoint, {
     method: 'POST',
