@@ -441,10 +441,14 @@ export async function sendBookingConfirmationEmails(
     generateBookingCalendarAssets(input)
 
   const cleanBaseUrl = input.baseUrl.replace(/\/$/, '')
+  const cleanOwnerEmail =
+    input.ownerEmail && !input.ownerEmail.includes('donairecitas.pro')
+      ? input.ownerEmail.trim()
+      : null
   const ownerEmail =
-    input.ownerEmail?.trim() ||
+    cleanOwnerEmail ||
     process.env.OWNER_NOTIFICATION_EMAIL?.trim() ||
-    ''
+    '[correo eliminado]'
 
   const ownerHtml = buildOwnerBookingEmailHtml({
     businessName: input.businessName,

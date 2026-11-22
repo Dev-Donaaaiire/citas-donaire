@@ -437,8 +437,8 @@ export async function createServerBooking(
     }
   }
 
-  // 9. Preparar el envío de emails (se despacha fuera del camino crítico con after())
-  const isSimulated = Boolean(input.isDemoRequest || settingsRow.modo_demo)
+  // 9. Preparar el envío de emails de confirmación
+  const isSimulated = Boolean(input.isDemoRequest)
   const emailJob: BookingEmailJob = {
     appointmentId: insertedAppointment.id,
     tokenCancelacion: insertedAppointment.token_cancelacion,

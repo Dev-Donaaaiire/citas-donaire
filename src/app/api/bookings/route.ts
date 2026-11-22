@@ -44,9 +44,9 @@ export async function POST(request: NextRequest) {
       toBookingInput(body, baseUrl, false)
     )
 
-    // Los emails se envían tras responder: la confirmación en móvil es instantánea.
+    // Envío síncrono fiable para asegurar la entrega en Vercel Serverless
     if (emailJob) {
-      after(() => dispatchBookingEmailJob(emailJob))
+      await dispatchBookingEmailJob(emailJob)
     }
 
     return NextResponse.json(result, { status: 201 })
