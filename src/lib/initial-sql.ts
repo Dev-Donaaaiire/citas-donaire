@@ -567,4 +567,16 @@ $$;
 
 REVOKE ALL ON FUNCTION public.cancel_appointment_by_token(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.cancel_appointment_by_token(UUID) TO anon, authenticated, service_role;
+
+-- 9. Permisos globales de Supabase (esquema, tablas, secuencias y recarga de caché)
+GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO postgres, anon, authenticated, service_role;
+
+NOTIFY pgrst, 'reload schema';
 `;
