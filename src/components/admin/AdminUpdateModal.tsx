@@ -42,14 +42,19 @@ jobs:
 
       - name: Sincronizar aplicación con Upstream Oficial
         run: |
-          git config user.name "Krono Updater"
-          git config user.email "bot@citas-donaire.dev"
-          git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git || true
+          git config user.name "\${{ github.actor }}"
+          git config user.email "\${{ github.actor_id }}+\${{ github.actor }}@users.noreply.github.com"
+          git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git || git remote set-url upstream https://github.com/Dev-Donaaaiire/citas-donaire.git
           git fetch upstream main
           git checkout upstream/main -- src public package.json package-lock.json next.config.ts tsconfig.json README.md
           git add -A
-          git commit -m "chore(krono): actualización automática de la aplicación" || echo "Sin cambios nuevos"
-          git push origin main
+          if git diff --staged --quiet; then
+            echo "Sin cambios nuevos: el repositorio ya está en la última versión."
+          else
+            git commit -m "chore(krono): sincronización con última versión de Krono"
+            git push origin HEAD:main
+            echo "¡Actualización enviada con éxito a main! Vercel desplegará los cambios."
+          fi
 `
 
 const WORKFLOW_FILE_PATH = '.github/workflows/krono-sync.yml'
@@ -339,6 +344,18 @@ export function AdminUpdateModal({
             <p className="text-[10px] text-zinc-400 leading-relaxed">
               💡 Una vez guardado, ya tendrás la pestaña <strong className="text-zinc-300">Actions</strong> habilitada para siempre en tu repositorio, y podrás aplicar todas las actualizaciones de Krono con el botón verde inferior en 1 clic.
             </p>
+
+            {/* Aviso sobre permisos de GitHub Actions si falla con 403 */}
+            <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-white/5 space-y-1">
+              <p className="text-[11px] text-zinc-300 font-medium flex items-center gap-1.5">
+                <span className="text-amber-400">⚠️</span> ¿Te sale el Workflow en rojo (❌)?
+              </p>
+              <p className="text-[10px] text-zinc-400 leading-relaxed">
+                Por seguridad, GitHub bloquea por defecto la escritura de Actions. En tu GitHub ve a:{' '}
+                <strong className="text-zinc-200">Settings → Actions → General → Workflow permissions</strong> → selecciona{' '}
+                <strong className="text-amber-300">«Read and write permissions»</strong> y pulsa Guardar.
+              </p>
+            </div>
           </div>
 
           {/* Cómo actualizar */}
