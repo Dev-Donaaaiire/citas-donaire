@@ -24,16 +24,16 @@ jobs:
       contents: write
     steps:
       - name: Repositorio del cliente
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
 
       - name: Descargar el actualizador oficial
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ inputs.tool_repo }}
           ref: ${{ inputs.tool_ref }}
