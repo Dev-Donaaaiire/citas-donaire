@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState } from 'react'
 import { Sparkles, ArrowRight, X } from 'lucide-react'
-import type { SystemVersionInfo } from '@/lib/version'
+import { isUpdateOverdue, type SystemVersionInfo } from '@/lib/version'
 import { AdminUpdateModal } from '@/components/admin/AdminUpdateModal'
 
 export function AdminUpdateBanner() {
   const [versionInfo, setVersionInfo] = useState<SystemVersionInfo | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [overdue, setOverdue] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -20,6 +21,7 @@ export function AdminUpdateBanner() {
           const data = (await res.json()) as SystemVersionInfo
           if (isMounted) {
             setVersionInfo(data)
+            setOverdue(isUpdateOverdue(data.releaseDate))
           }
         }
       } catch {
@@ -64,6 +66,12 @@ export function AdminUpdateBanner() {
               <p className="text-zinc-400 text-[11px] line-clamp-1">
                 {versionInfo.changelog[0] || 'Mejoras de rendimiento y nuevas funcionalidades.'}
               </p>
+              {overdue && (
+                <p role="alert" className="text-amber-300 text-[11px]">
+                  La actualización automática no se ha aplicado. Revisa la pestaña
+                  Actions de tu repositorio en GitHub.
+                </p>
+              )}
             </div>
           </div>
 

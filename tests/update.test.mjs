@@ -54,6 +54,16 @@ test('actualiza solo a versiones publicadas y respeta lo del cliente', () => {
     assert.equal(git(client, 'status', '--porcelain'), '')
     assert.equal(run(), null)
 
+    // Una versión retirada no se instala
+    commit(upstream, { 'package.json': pkg('1.3.0') })
+    git(upstream, 'tag', 'v1.3.0')
+    commit(upstream, { 'withdrawn-versions.json': '["v1.3.0"]' })
+    assert.equal(run(), null)
+    commit(upstream, { 'withdrawn-versions.json': 'no es json' })
+    assert.throws(run)
+    commit(upstream, { 'withdrawn-versions.json': '[]' })
+    assert.equal(run(), 'v1.3.0')
+
     write(client, 'src/a.txt', 'cambio local sin guardar')
     assert.throws(run, /sin guardar/)
   } finally {

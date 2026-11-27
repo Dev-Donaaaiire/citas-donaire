@@ -43,6 +43,15 @@ export function compareSemver(v1: string, v2: string): number {
   return 0
 }
 
+/** La actualización semanal ya debería haberse aplicado. */
+export function isUpdateOverdue(
+  releaseDate: string | undefined,
+  now = Date.now()
+): boolean {
+  const published = Date.parse(releaseDate ?? '')
+  return Number.isFinite(published) && now - published > 9 * 86_400_000
+}
+
 let cachedVersionInfo: { timestamp: number; data: SystemVersionInfo } | null = null
 const CACHE_TTL_MS = 60 * 1000 // 1 minuto para comprobación ágil
 

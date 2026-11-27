@@ -27,6 +27,7 @@ Copia `.env.example` a `.env.local`, rellena las variables y define `SUPABASE_DB
 
 Cada lunes, el workflow `krono-sync.yml` trae la última versión publicada, ejecuta los tests, compila y solo entonces la sube; Vercel la despliega y aplica los cambios de base de datos. También puede lanzarse a mano (Actions → Run workflow).
 
+- Si una actualización falla, se abre un aviso (Issue) en el repositorio del cliente y el panel lo señala pasados 9 días.
 - Para desactivar la automática: Settings → Secrets and variables → Actions → Variables → `KRONO_AUTO_UPDATE=false`.
 - Se sobrescriben `src`, `supabase`, `scripts`, `tests` y la configuración del proyecto: no los edites si quieres recibir actualizaciones.
 - Instalaciones anteriores a la 1.5.0: sustituye una vez `.github/workflows/krono-sync.yml` por el que muestra el panel.
@@ -34,7 +35,9 @@ Cada lunes, el workflow `krono-sync.yml` trae la última versión publicada, eje
 ### Publicar una versión (solo el autor)
 1. Sube `version` en `package.json` y actualiza `RELEASE_NOTES` en `src/lib/version.ts`.
 2. Si cambia la base de datos, añade un archivo nuevo en `supabase/migrations/` posterior al último. Solo debe añadir cosas, sin borrar datos.
-3. Al fusionar en `main`, GitHub comprueba lint, tests y compilación y crea la etiqueta `vX.Y.Z`.
+3. Al fusionar en `main`, GitHub comprueba lint, tests y compilación, crea la etiqueta `vX.Y.Z` y mueve `v1` (el actualizador que usan los clientes).
+
+**Retirar una versión defectuosa:** añádela a `withdrawn-versions.json` en `main` (p. ej. `["v1.6.0"]`). Nadie la instalará desde ese momento. A quien ya la tenga no se le revierte: publica una versión superior con la corrección.
 
 ## Flujo recomendado para compradores
 

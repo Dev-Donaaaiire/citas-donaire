@@ -8,6 +8,9 @@ import { pathToFileURL } from 'node:url'
 
 export const UPSTREAM = 'https://github.com/Dev-Donaaaiire/citas-donaire.git'
 
+/** Lista en la rama principal del autor, p. ej. ["v1.6.0"]. */
+const WITHDRAWN_FILE = 'withdrawn-versions.json'
+
 /** Se copian exactas: lo que ya no exista en la versión nueva se borra. */
 const MIRRORED = ['src', 'supabase', 'scripts', 'tests']
 /** Se sobrescriben o añaden, sin borrar nada del cliente. */
@@ -39,14 +42,26 @@ export function update({ cwd = process.cwd(), upstream = UPSTREAM, push = false,
     throw new Error('Hay cambios sin guardar. Haz commit o descártalos antes de actualizar.')
   }
 
+  // Freno de emergencia: versiones retiradas según la rama principal del autor.
+  // Si no se puede consultar, no se actualiza.
+  git('fetch', '--depth', '1', upstream, 'HEAD')
+  let withdrawn = []
+  if (git('ls-tree', '--name-only', 'FETCH_HEAD', '--', WITHDRAWN_FILE)) {
+    withdrawn = JSON.parse(git('show', `FETCH_HEAD:${WITHDRAWN_FILE}`))
+    if (!Array.isArray(withdrawn)) throw new Error(`${WITHDRAWN_FILE} no es una lista.`)
+  }
+
   const latest = git('ls-remote', '--tags', '--refs', upstream)
     .split('\n')
     .map((line) => line.split('refs/tags/')[1])
-    .filter((tag) => /^v\d+\.\d+\.\d+$/.test(tag ?? ''))
+    .filter((tag) => /^v\d+\.\d+\.\d+$/.test(tag ?? '') && !withdrawn.includes(tag))
     .sort(compareVersions)
     .at(-1)
 
   const current = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8')).version
+  if (withdrawn.includes(`v${current}`)) {
+    log(`AVISO: tu versión ${current} ha sido retirada. Se instalará la corrección en cuanto se publique.`)
+  }
   if (!latest) {
     log('No hay ninguna versión publicada todavía.')
     return null

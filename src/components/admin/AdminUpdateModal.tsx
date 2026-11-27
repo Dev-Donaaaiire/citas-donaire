@@ -32,6 +32,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   update:
@@ -40,7 +41,7 @@ jobs:
     if: >-
       github.repository != 'Dev-Donaaaiire/citas-donaire' &&
       (github.event_name == 'workflow_dispatch' || vars.KRONO_AUTO_UPDATE != 'false')
-    uses: Dev-Donaaaiire/citas-donaire/.github/workflows/krono-update.yml@main
+    uses: Dev-Donaaaiire/citas-donaire/.github/workflows/krono-update.yml@v1
 `
 
 const WORKFLOW_FILE_PATH = '.github/workflows/krono-sync.yml'

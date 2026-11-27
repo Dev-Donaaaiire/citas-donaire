@@ -41,4 +41,7 @@ jobs:
             echo "La versión $tag ya estaba publicada."
           else
             gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --generate-notes
+            # v1 señala el actualizador estable que ejecutan los clientes
+            git tag -f v1 "$GITHUB_SHA"
+            git push -f origin refs/tags/v1
           fi

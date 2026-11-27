@@ -4,6 +4,18 @@ name: Krono Update (central)
 
 on:
   workflow_call:
+    inputs:
+      tool_repo:
+        description: Repositorio del actualizador (solo para pruebas)
+        type: string
+        default: Dev-Donaaaiire/citas-donaire
+      tool_ref:
+        type: string
+        default: v1
+      upstream:
+        description: Origen de las versiones (vacío = repositorio oficial)
+        type: string
+        default: ''
 
 jobs:
   update:
@@ -23,13 +35,15 @@ jobs:
       - name: Descargar el actualizador oficial
         uses: actions/checkout@v4
         with:
-          repository: Dev-Donaaaiire/citas-donaire
-          ref: main
+          repository: ${{ inputs.tool_repo }}
+          ref: ${{ inputs.tool_ref }}
           path: .krono-tool
           sparse-checkout: scripts
 
       - name: Traer la última versión publicada
         id: update
+        env:
+          KRONO_UPSTREAM: ${{ inputs.upstream }}
         run: |
           cp .krono-tool/scripts/update.mjs "$RUNNER_TEMP/krono-update.mjs"
           rm -rf .krono-tool
@@ -47,3 +61,31 @@ jobs:
       - name: Publicar (Vercel desplegará y aplicará la base de datos)
         if: steps.update.outputs.version != ''
         run: git push origin HEAD
+
+  # Deja constancia en el repositorio del cliente si algo falla (GitHub le avisa)
+  notify:
+    needs: update
+    if: always() && (needs.update.result == 'success' || needs.update.result == 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT: ${{ needs.update.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITLE: La actualización automática de Krono ha fallado
+        run: |
+          number=$(gh issue list --state open --limit 100 --json number,title \
+            --jq "map(select(.title == env.TITLE)) | .[0].number // empty")
+          if [ "$RESULT" = "failure" ]; then
+            body="Tu web sigue con la versión anterior. Detalle: $RUN_URL"
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body "$body"
+            else
+              gh issue create --title "$TITLE" --body "$body"
+            fi
+          elif [ -n "$number" ]; then
+            gh issue close "$number" --comment "Resuelto: $RUN_URL"
+          fi
