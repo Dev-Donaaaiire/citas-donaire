@@ -6,7 +6,12 @@ const { isUpdateOverdue } = await import('@/lib/version')
 const read = (path) =>
   readFileSync(new URL('../' + path, import.meta.url), 'utf8').replaceAll('\r\n', '\n')
 
-test('el panel muestra el mismo workflow que el repositorio', () => {
+// Solo tiene sentido en el repositorio oficial: el workflow del cliente no se
+// actualiza solo, y exigirlo igual bloquearía sus actualizaciones.
+const repository = process.env.GITHUB_REPOSITORY
+const clientRepo = Boolean(repository) && repository !== 'Dev-Donaaaiire/citas-donaire'
+
+test('el panel muestra el mismo workflow que el repositorio', { skip: clientRepo }, () => {
   const modal = read('src/components/admin/AdminUpdateModal.tsx')
   const start = modal.indexOf('KRONO_SYNC_YML_CONTENT = `') + 'KRONO_SYNC_YML_CONTENT = `'.length
   const shown = modal.slice(start, modal.indexOf('`\n\nconst WORKFLOW_FILE_PATH', start))
