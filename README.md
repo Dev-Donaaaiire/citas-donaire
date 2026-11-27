@@ -17,6 +17,9 @@ La base de datos se crea y actualiza sola durante la compilación. Para enviar e
 
 > El plan Hobby de Vercel no permite uso comercial: un negocio necesita un plan que lo permita.
 
+### Certificado de la base de datos (una sola vez, el autor)
+Las migraciones validan siempre el certificado del servidor. Descarga el certificado raíz en Supabase → Project Settings → Database → SSL Configuration y guárdalo como `src/db/supabase-ca.crt` antes de publicar la versión. Es público y viaja con las actualizaciones. Alternativa por instalación: variable `SUPABASE_DB_CA` con su contenido.
+
 ### Instalación manual
 Copia `.env.example` a `.env.local`, rellena las variables y define `SUPABASE_DB_URL` para que `npm run build` (o `npm run migrate` con la variable exportada) prepare la base. Sin ella, ejecuta el script de `/setup` en el SQL Editor.
 

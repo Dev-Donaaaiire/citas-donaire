@@ -73,9 +73,13 @@ test('no hace nada en previsualizaciones, si se desactiva o sin conexión', () =
   assert.equal(skipReason({ VERCEL_ENV: 'production', SUPABASE_DB_URL: url }), null)
 })
 
-test('solo deja de validar el certificado en dominios de Supabase', () => {
-  assert.equal(sslConfig('postgresql://a:b@db.example.com/p', {}).rejectUnauthorized, true)
-  assert.equal(sslConfig('postgresql://a:b@x.pooler.supabase.com/p', {}).rejectUnauthorized, false)
-  assert.equal(sslConfig('postgresql://a:b@evilsupabase.com/p', {}).rejectUnauthorized, true)
-  assert.deepEqual(sslConfig('postgresql://a:b@x.pooler.supabase.com/p', { SUPABASE_DB_CA: 'CA' }), { ca: 'CA' })
+test('valida siempre el certificado del servidor', () => {
+  for (const host of ['db.example.com', 'x.pooler.supabase.com']) {
+    const url = `postgresql://a:b@${host}/p?sslmode=require`
+    assert.deepEqual(sslConfig(url, {}, null), { rejectUnauthorized: true })
+    const withCa = sslConfig(url, { SUPABASE_DB_CA: 'CA' }, null)
+    assert.equal(withCa.rejectUnauthorized, true)
+    assert.equal(withCa.ca.at(-1), 'CA')
+  }
+  assert.equal(sslConfig('postgresql://a:b@127.0.0.1/p', {}, null), false)
 })

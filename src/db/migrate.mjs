@@ -4,7 +4,8 @@
 //  - Después: solo las migraciones nuevas de supabase/migrations/.
 // Todo va en una transacción: si algo falla, la base queda como estaba y el
 // despliegue se detiene (sigue publicada la versión anterior).
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { rootCertificates } from 'node:tls'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import pg from 'pg'
 
@@ -35,17 +36,20 @@ export function skipReason(env = process.env) {
   return null
 }
 
-export function sslConfig(raw, env = process.env) {
+/** Certificado raíz de Supabase (Database Settings -> SSL), si está en el repositorio. */
+function bundledCa() {
+  const file = new URL('src/db/supabase-ca.crt', root)
+  return existsSync(file) ? readFileSync(file, 'utf8') : null
+}
+
+// El certificado del servidor se valida SIEMPRE; la CA propia solo amplía la confianza
+export function sslConfig(raw, env = process.env, fileCa = bundledCa()) {
   const url = new URL(raw)
-  const local = ['localhost', '127.0.0.1'].includes(url.hostname)
-  if (local || url.searchParams.get('sslmode') === 'disable') return false
-  // Con la CA de Supabase (Database Settings -> SSL) se valida el certificado
-  const ca = env.SUPABASE_DB_CA?.trim()
-  if (ca) return { ca }
-  // Supabase firma con una CA propia que Node no conoce: solo para sus dominios
-  // se cifra sin validar la cadena. Cualquier otro servidor se valida siempre.
-  const isSupabase = /\.supabase\.(co|com)$/.test(url.hostname)
-  return { rejectUnauthorized: !isSupabase }
+  if (['localhost', '127.0.0.1'].includes(url.hostname)) return false
+  const ca = env.SUPABASE_DB_CA?.trim() || fileCa
+  return ca
+    ? { rejectUnauthorized: true, ca: [...rootCertificates, ca] }
+    : { rejectUnauthorized: true }
 }
 
 function connectionConfig(raw) {
@@ -133,6 +137,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     } catch (err) {
       // Nunca se imprime la cadena de conexión
       console.error('[migrate] Error aplicando la base de datos:', err.message)
+      if (/certificate/i.test(err.message)) {
+        console.error('[migrate] Falta el certificado raíz de Supabase: guárdalo en src/db/supabase-ca.crt (ver README).')
+      }
       process.exit(1)
     }
   }
