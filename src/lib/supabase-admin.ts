@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { supabaseServiceKey } from '@/lib/supabase-env'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 
@@ -21,13 +22,13 @@ export function isAnonKey(key?: string | null): boolean {
 
 export function hasSupabaseAdminConfig(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  const serviceKey = supabaseServiceKey()
   return Boolean(url && serviceKey && !isAnonKey(serviceKey))
 }
 
 export function getSupabaseAdmin(): SupabaseClient<Database> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  const serviceKey = supabaseServiceKey()
 
   if (!url || !serviceKey) {
     throw new Error(

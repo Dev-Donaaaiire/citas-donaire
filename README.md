@@ -4,36 +4,34 @@ Plataforma Next.js 16 (App Router, `proxy.ts`, Server Components, React 19, Tail
 
 ---
 
-## Despliegue en 1 clic (Vercel)
+## Instalación (Vercel + Supabase)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDev-Donaaaiire%2Fcitas-donaire%2Ftree%2Fmain&env=NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY&envDescription=Introduce%20tus%20credenciales%20de%20Supabase%2C%20clave%20de%20administrador%2C%20Resend%20y%20tu%20LICENSE_KEY&project-name=agenda-citas&repository-name=agenda-citas)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDev-Donaaaiire%2Fcitas-donaire%2Ftree%2Fmain&env=ADMIN_PASSWORD,LICENSE_KEY&envDescription=Contrase%C3%B1a%20del%20panel%20(m%C3%ADn.%2010)%20y%20clave%20de%20licencia&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22supabase%22%2C%22productSlug%22%3A%22supabase%22%2C%22protocol%22%3A%22storage%22%7D%5D&project-name=agenda-citas&repository-name=agenda-citas)
 
----
+1. Pulsa el botón y entra con GitHub.
+2. Acepta crear la base de datos Supabase: las claves se rellenan solas.
+3. Escribe `ADMIN_PASSWORD` (mínimo 10 caracteres) y `LICENSE_KEY`.
+4. Al terminar, entra en `/setup` y configura tu negocio.
 
-## Puesta en marcha rápida
+La base de datos se crea y actualiza sola durante la compilación. Para enviar emails añade después `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (dominio verificado) y `OWNER_NOTIFICATION_EMAIL`.
 
-1. **Clonar e instalar dependencias**:
-   ```bash
-   git clone https://github.com/Dev-Donaaaiire/citas-donaire.git
-   cd citas-donaire
-   npm install
-   ```
-2. **Configurar variables de entorno**:
-   Copia `.env.example` a `.env.local` y rellena:
-   - `NEXT_PUBLIC_APP_URL`
-   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`
-   - `ADMIN_PASSWORD` (mínimo 10 caracteres) y `ADMIN_SESSION_SECRET` (mínimo 16 caracteres, obligatorio en producción)
-   - `RESEND_API_KEY` y `RESEND_FROM_EMAIL` (verifica tu dominio en Resend para envíos a clientes externos)
-   - `LICENSE_KEY` (desbloquea producción cuando `modo_demo = false`)
-   - `ALLOW_PUBLIC_DEMO_DB` (opcional; solo con `true` y `modo_demo` activo las rutas `/demo` usan la base de datos real; por defecto, sandbox)
-3. **Aplicar migraciones SQL en Supabase**:
-   Ejecuta las migraciones de `supabase/migrations/` en orden (incluyendo `20261115000000_security_hardening_rls_constraints_rpc.sql`, `20261115010000_rate_limit_and_atomic_counters.sql` y `20261127000000_tighten_rls_policies.sql`) o utiliza el bloque SQL completo sincronizado disponible dentro de `/setup` o en `src/lib/initial-sql.ts`. En instalaciones existentes, aplica a mano las migraciones nuevas tras cada actualización.
-4. **Verificar en local**:
-   ```bash
-   npm run dev
-   ```
+> El plan Hobby de Vercel no permite uso comercial: un negocio necesita un plan que lo permita.
 
----
+### Instalación manual
+Copia `.env.example` a `.env.local`, rellena las variables y define `SUPABASE_DB_URL` para que `npm run build` (o `npm run migrate` con la variable exportada) prepare la base. Sin ella, ejecuta el script de `/setup` en el SQL Editor.
+
+## Actualizaciones
+
+Cada lunes, el workflow `krono-sync.yml` trae la última versión publicada, ejecuta los tests, compila y solo entonces la sube; Vercel la despliega y aplica los cambios de base de datos. También puede lanzarse a mano (Actions → Run workflow).
+
+- Para desactivar la automática: Settings → Secrets and variables → Actions → Variables → `KRONO_AUTO_UPDATE=false`.
+- Se sobrescriben `src`, `supabase`, `scripts`, `tests` y la configuración del proyecto: no los edites si quieres recibir actualizaciones.
+- Instalaciones anteriores a la 1.5.0: sustituye una vez `.github/workflows/krono-sync.yml` por el que muestra el panel.
+
+### Publicar una versión (solo el autor)
+1. Sube `version` en `package.json` y actualiza `RELEASE_NOTES` en `src/lib/version.ts`.
+2. Si cambia la base de datos, añade un archivo nuevo en `supabase/migrations/` posterior al último. Solo debe añadir cosas, sin borrar datos.
+3. Al fusionar en `main`, GitHub comprueba lint, tests y compilación y crea la etiqueta `vX.Y.Z`.
 
 ## Flujo recomendado para compradores
 

@@ -17,43 +17,30 @@ import {
 } from 'lucide-react'
 import {
   CURRENT_SYSTEM_VERSION,
+  RELEASE_NOTES,
   UPSTREAM_GITHUB_REPO,
   type SystemVersionInfo,
 } from '@/lib/version'
 import { AccessibleModal } from '@/components/ui/AccessibleModal'
 
-const KRONO_SYNC_YML_CONTENT = `name: Krono Auto-Sync & Update
+const KRONO_SYNC_YML_CONTENT = `name: Krono Auto-Update
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1' # lunes de madrugada (UTC)
 
 permissions:
   contents: write
 
 jobs:
-  sync-upstream:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repositorio
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Sincronizar aplicación con Upstream Oficial
-        run: |
-          git config user.name "\${{ github.actor }}"
-          git config user.email "\${{ github.actor_id }}+\${{ github.actor }}@users.noreply.github.com"
-          git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git || git remote set-url upstream https://github.com/Dev-Donaaaiire/citas-donaire.git
-          git fetch upstream main
-          git checkout upstream/main -- src public package.json package-lock.json next.config.ts tsconfig.json README.md supabase/migrations
-          git add -A
-          if git diff --staged --quiet; then
-            echo "Sin cambios nuevos: el repositorio ya está en la última versión."
-          else
-            git commit -m "chore(krono): sincronización con última versión de Krono"
-            git push origin HEAD:main
-            echo "¡Actualización enviada con éxito a main! Vercel desplegará los cambios."
-          fi
+  update:
+    # La actualización automática se desactiva creando la variable de repositorio
+    # KRONO_AUTO_UPDATE=false (la manual sigue funcionando).
+    if: >-
+      github.repository != 'Dev-Donaaaiire/citas-donaire' &&
+      (github.event_name == 'workflow_dispatch' || vars.KRONO_AUTO_UPDATE != 'false')
+    uses: Dev-Donaaaiire/citas-donaire/.github/workflows/krono-update.yml@main
 `
 
 const WORKFLOW_FILE_PATH = '.github/workflows/krono-sync.yml'
@@ -79,12 +66,7 @@ export function AdminUpdateModal({
     currentVersion: CURRENT_SYSTEM_VERSION,
     latestVersion: CURRENT_SYSTEM_VERSION,
     updateAvailable: false,
-    changelog: [
-      '⚙️ Personalización del formulario de reserva: elige qué campos son obligatorios, opcionales u ocultos.',
-      '💡 Análisis de impacto en tiempo real: especificación clara de qué funciones se pierden o ganan con cada campo.',
-      '🛡️ Reservas flexibles con compatibilidad universal en base de datos para clientes sin email o teléfono.',
-      '📊 Tabla de retención y agenda adaptadas con indicadores de estado para clientes sin datos de contacto.',
-    ],
+    changelog: RELEASE_NOTES,
     upstreamRepo: UPSTREAM_GITHUB_REPO,
     userRepo: UPSTREAM_GITHUB_REPO,
     oneClickSyncUrl: `https://github.com/${UPSTREAM_GITHUB_REPO}`,
@@ -100,7 +82,7 @@ export function AdminUpdateModal({
     `https://github.com/${activeInfo.userRepo || UPSTREAM_GITHUB_REPO}/new/main?filename=.github/workflows/krono-sync.yml`
 
   const terminalCmd =
-    'git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git\ngit pull upstream main --allow-unrelated-histories\ngit push origin main'
+    'node scripts/update.mjs --push'
 
   const handleCopyCmd = () => {
     navigator.clipboard.writeText(terminalCmd)

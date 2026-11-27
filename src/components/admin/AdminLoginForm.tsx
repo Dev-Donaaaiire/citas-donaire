@@ -104,12 +104,9 @@ export function AdminLoginForm({
                 <code className="px-1.5 py-0.5 rounded bg-zinc-900 font-mono text-amber-100">
                   ADMIN_PASSWORD
                 </code>{' '}
-                (mínimo 10 caracteres) y{' '}
-                <code className="px-1.5 py-0.5 rounded bg-zinc-900 font-mono text-amber-100">
-                  ADMIN_SESSION_SECRET
-                </code>{' '}
-                (mínimo 16 caracteres, obligatorio en producción) en las
-                variables de entorno del proyecto y reinicies el servidor.
+                (mínimo 10 caracteres) y
+                conectes Supabase en las variables de entorno del proyecto, y
+                vuelvas a desplegar.
               </p>
             </div>
           ) : (

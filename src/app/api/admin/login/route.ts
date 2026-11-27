@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            'Autenticación no configurada en el servidor. Define ADMIN_PASSWORD (mín. 10 caracteres) y ADMIN_SESSION_SECRET (mín. 16 caracteres) en tus variables de entorno.',
+            'Autenticación no configurada en el servidor. Define ADMIN_PASSWORD (mín. 10 caracteres) y conecta Supabase en tus variables de entorno.',
         },
         { status: 503 }
       )

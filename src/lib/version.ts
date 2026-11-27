@@ -1,4 +1,13 @@
-export const CURRENT_SYSTEM_VERSION = '1.4.0'
+/** Se rellena desde package.json (ver next.config.ts). */
+export const CURRENT_SYSTEM_VERSION =
+  process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0'
+export const RELEASE_DATE = '2026-11-28'
+export const RELEASE_NOTES = [
+  '⚙️ La base de datos se actualiza sola en cada despliegue.',
+  '🔄 Actualizaciones semanales automáticas a versiones publicadas.',
+  '🚀 Instalación con Supabase incluido desde el botón de Vercel.',
+  '🛡️ Correcciones de seguridad en permisos, demo, PayPal y reservas.',
+]
 export const UPSTREAM_GITHUB_REPO = 'Dev-Donaaaiire/citas-donaire'
 export const DEFAULT_VERSION_API_URL =
   process.env.VERSION_API_URL ||
@@ -85,12 +94,7 @@ export async function checkSystemUpdate(options?: {
         latestVersion: currentVersion,
         updateAvailable: false,
         commitHash: 'head',
-        changelog: [
-          '🔔 Notificación por correo al cliente al bloquear fechas u horarios con citas confirmadas.',
-          '🔄 Enlace directo de reprogramación en 1 clic sin volver a rellenar datos personales.',
-          '🛡️ Protección contra cancelaciones accidentales con confirmación de seguridad en /cancelar.',
-          '🚀 Asistente de actualización Krono con soporte para Vercel Clone y scripts automáticos.',
-        ],
+        changelog: RELEASE_NOTES,
         upstreamRepo: UPSTREAM_GITHUB_REPO,
         userRepo: userRepo || UPSTREAM_GITHUB_REPO,
         oneClickSyncUrl,

@@ -1,6 +1,7 @@
+import { supabaseAnonKey } from '@/lib/supabase-env'
 import 'server-only'
 
-import { hasExplicitSessionSecret } from '@/lib/admin-session-token'
+import { isAdminAuthConfigured } from '@/lib/admin-session-token'
 import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
 import {
   resolveTrustedDeploymentDomain,
@@ -32,14 +33,14 @@ export interface InitialSetupPayload {
 export async function getAdminSetupData(): Promise<InitialSetupPayload> {
   const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL?.trim())
   const hasSupabaseAnonKey = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+    supabaseAnonKey()
   )
   const hasServiceRole = hasSupabaseAdminConfig()
   const hasResendKey = Boolean(
     process.env.RESEND_API_KEY?.trim()?.startsWith('re_')
   )
   const hasLicenseKey = Boolean(process.env.LICENSE_KEY?.trim())
-  const hasAdminSecret = hasExplicitSessionSecret()
+  const hasAdminSecret = isAdminAuthConfigured()
 
   let schemaReady = false
   let dbErrorDetail: string | null = null

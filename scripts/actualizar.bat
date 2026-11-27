@@ -1,19 +1,6 @@
 @echo off
 chcp 65001 >nul
-echo ========================================================
-echo   Krono Citas - Actualizador Automático
-echo ========================================================
-echo Conectando con el repositorio oficial upstream...
-git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git 2>nul
-git fetch upstream main
-echo Sincronizando archivos del sistema...
-git checkout upstream/main -- src public package.json package-lock.json next.config.ts tsconfig.json README.md supabase/migrations
-git add -A
-git commit -m "chore(krono): actualizacion automatica a la ultima version" 2>nul
-git push origin main
-echo.
-echo ========================================================
-echo   ¡Listo! Cambios subidos a tu repositorio.
-echo   Vercel desplegará la nueva versión automáticamente.
-echo ========================================================
+rem Actualiza a la ultima version publicada y la sube a tu repositorio.
+cd /d "%~dp0.."
+node scripts\update.mjs --push
 pause

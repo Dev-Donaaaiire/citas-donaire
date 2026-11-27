@@ -1,3 +1,4 @@
+import { supabaseAnonKey as readAnonKey } from '@/lib/supabase-env'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 
@@ -8,7 +9,7 @@ const fallbackAnonKey =
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || fallbackUrl
 const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || fallbackAnonKey
+  readAnonKey() || fallbackAnonKey
 
 export const supabase: SupabaseClient<Database> = createClient<Database>(
   supabaseUrl,
@@ -17,6 +18,6 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 
 export function isSupabaseConfigured(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  const key = readAnonKey()
   return Boolean(url && key && !url.includes('placeholder'))
 }

@@ -491,8 +491,9 @@ export function SetupContent({
                 Script SQL Endurecido (RLS, GiST y RPCs)
               </h2>
               <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-                Si estrenas proyecto en Supabase, copia este script completo y
-                ejecútalo una única vez en{' '}
+                La base de datos se prepara y actualiza sola en cada despliegue.
+                Solo si no conectaste Supabase desde Vercel, copia este script y
+                ejecútalo en{' '}
                 <strong className="text-zinc-200">
                   Supabase Dashboard → SQL Editor
                 </strong>

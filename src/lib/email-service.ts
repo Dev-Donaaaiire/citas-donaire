@@ -22,9 +22,17 @@ export function buildVercelOneClickDeployUrl(repoUrl?: string): string {
   }
   const params = new URLSearchParams({
     'repository-url': targetRepo,
-    env: 'NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,ADMIN_PASSWORD,ADMIN_SESSION_SECRET,RESEND_API_KEY,LICENSE_KEY',
+    env: 'ADMIN_PASSWORD,LICENSE_KEY',
     envDescription:
-      'Configura tu base de datos Supabase, clave de administrador, Resend y tu clave LICENSE_KEY para activar tu sistema de citas.',
+      'Elige una contraseña para tu panel (mínimo 10 caracteres) y pega la clave de licencia recibida por email.',
+    stores: JSON.stringify([
+      {
+        type: 'integration',
+        integrationSlug: 'supabase',
+        productSlug: 'supabase',
+        protocol: 'storage',
+      },
+    ]),
     'project-name': 'agenda-citas',
     'repository-name': 'agenda-citas',
   })

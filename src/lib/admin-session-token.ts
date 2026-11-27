@@ -1,3 +1,5 @@
+import { supabaseServiceKey } from '@/lib/supabase-env'
+
 export const ADMIN_SESSION_COOKIE_NAME = 'krono_admin_session'
 export const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 12 // 12 horas
 
@@ -47,15 +49,16 @@ function getHmacSecretMaterial(): string | null {
   if (explicitSecret && explicitSecret.length >= 16) {
     return `krono-session-secret-v1:${explicitSecret}`
   }
-  // En producción exigimos secreto explícito; solo en desarrollo derivamos de la contraseña.
-  if (process.env.NODE_ENV === 'production') {
-    return null
+  const password = process.env.ADMIN_PASSWORD?.trim()
+  if (!password || password.length < MIN_ADMIN_PASSWORD_LENGTH) return null
+  // Sin secreto explícito se combina la contraseña con la clave de servidor de
+  // Supabase (larga y aleatoria), así una cookie no permite adivinar la contraseña.
+  const serverKey = supabaseServiceKey()
+  if (serverKey) {
+    return `krono-session-derived-v2:${password}:${serverKey}`
   }
-  const passwordFallback = process.env.ADMIN_PASSWORD?.trim()
-  if (passwordFallback && passwordFallback.length >= MIN_ADMIN_PASSWORD_LENGTH) {
-    return `krono-session-pw-derived-v1:${passwordFallback}`
-  }
-  return null
+  if (process.env.NODE_ENV === 'production') return null
+  return `krono-session-pw-derived-v1:${password}`
 }
 
 async function importHmacKey(secret: string): Promise<CryptoKey> {
@@ -75,7 +78,6 @@ export function isAdminAuthConfigured(): boolean {
   const passwordOk = Boolean(
     password && password.length >= MIN_ADMIN_PASSWORD_LENGTH
   )
-  // En producción además se exige ADMIN_SESSION_SECRET explícito (>= 16 caracteres).
   return passwordOk && getHmacSecretMaterial() !== null
 }
 

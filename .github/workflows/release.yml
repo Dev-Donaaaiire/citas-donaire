@@ -1,0 +1,44 @@
+# Solo en el repositorio oficial. Comprueba cada cambio y, si la versión de
+# package.json es nueva y todo pasa, publica la etiqueta que reciben los clientes.
+name: Comprobar y publicar versión
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    if: github.repository == 'Dev-Donaaaiire/citas-donaire'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  release:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publicar etiqueta si la versión es nueva
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "La versión $tag ya estaba publicada."
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --generate-notes
+          fi

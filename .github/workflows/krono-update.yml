@@ -1,0 +1,49 @@
+# Actualizador central: los repositorios de los clientes solo lo llaman, así que
+# se puede corregir aquí sin que ellos cambien nada.
+name: Krono Update (central)
+
+on:
+  workflow_call:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Repositorio del cliente
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Descargar el actualizador oficial
+        uses: actions/checkout@v4
+        with:
+          repository: Dev-Donaaaiire/citas-donaire
+          ref: main
+          path: .krono-tool
+          sparse-checkout: scripts
+
+      - name: Traer la última versión publicada
+        id: update
+        run: |
+          cp .krono-tool/scripts/update.mjs "$RUNNER_TEMP/krono-update.mjs"
+          rm -rf .krono-tool
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          node "$RUNNER_TEMP/krono-update.mjs"
+
+      - name: Comprobar antes de publicar
+        if: steps.update.outputs.version != ''
+        run: |
+          npm ci
+          npm test
+          npx next build
+
+      - name: Publicar (Vercel desplegará y aplicará la base de datos)
+        if: steps.update.outputs.version != ''
+        run: git push origin HEAD

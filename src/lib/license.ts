@@ -1,3 +1,4 @@
+import { supabaseServiceKey } from '@/lib/supabase-env'
 import 'server-only'
 
 import crypto from 'node:crypto'
@@ -82,7 +83,7 @@ function getMasterSupabase(): SupabaseClient<Database> | null {
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
   const serviceKey =
     process.env.MASTER_SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    supabaseServiceKey()
 
   if (!url || !serviceKey || url.includes('tu-proyecto')) {
     return null

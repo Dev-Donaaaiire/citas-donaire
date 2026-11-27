@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
-import { UPSTREAM_GITHUB_REPO } from '@/lib/version'
+import {
+  CURRENT_SYSTEM_VERSION,
+  RELEASE_DATE,
+  RELEASE_NOTES,
+  UPSTREAM_GITHUB_REPO,
+} from '@/lib/version'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,16 +21,11 @@ export async function OPTIONS() {
 
 export async function GET() {
   const versionPayload = {
-    version: '1.4.0',
-    commitHash: 'v1.4.0',
-    releaseDate: '2026-11-22',
+    version: CURRENT_SYSTEM_VERSION,
+    commitHash: `v${CURRENT_SYSTEM_VERSION}`,
+    releaseDate: RELEASE_DATE,
     upstreamRepo: UPSTREAM_GITHUB_REPO,
-    changelog: [
-      '⚙️ Personalización del formulario de reserva: elige qué campos son obligatorios, opcionales u ocultos.',
-      '💡 Análisis de impacto en tiempo real: especificación clara de qué funciones se pierden o ganan con cada campo.',
-      '🛡️ Reservas flexibles con compatibilidad universal en base de datos para clientes sin email o teléfono.',
-      '📊 Tabla de retención y agenda adaptadas con indicadores de estado para clientes sin datos de contacto.',
-    ],
+    changelog: RELEASE_NOTES,
   }
 
   return NextResponse.json(versionPayload, {
