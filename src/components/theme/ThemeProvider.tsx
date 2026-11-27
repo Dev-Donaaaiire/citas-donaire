@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useSyncExternalStore,
 } from 'react'
+import { MotionConfig } from 'framer-motion'
 import {
   DEFAULT_THEME,
   THEMES,
@@ -83,7 +84,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [theme, setTheme]
   )
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  return (
+    <ThemeContext.Provider value={value}>
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
+    </ThemeContext.Provider>
+  )
 }
 
 export function useTheme(): ThemeContextValue {

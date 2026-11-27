@@ -448,7 +448,7 @@ export async function sendBookingConfirmationEmails(
   const ownerEmail =
     cleanOwnerEmail ||
     process.env.OWNER_NOTIFICATION_EMAIL?.trim() ||
-    '[correo eliminado]'
+    null
 
   const ownerHtml = buildOwnerBookingEmailHtml({
     businessName: input.businessName,
@@ -530,6 +530,17 @@ export async function sendBookingConfirmationEmails(
         attachments: [icsAttachment],
       })
     )
+  }
+
+  if (emailJobs.length === 0) {
+    return {
+      success: false,
+      simulated: false,
+      reason: 'no_recipients',
+      googleCalendarUrl,
+      cancelUrl,
+      icsFilename,
+    }
   }
 
   const results = await Promise.allSettled(emailJobs)
@@ -802,6 +813,7 @@ export async function sendLicenseDeliveryEmail(input: {
   plan: 'autoinstalable_15' | 'llave_en_mano_99'
   amountCents?: number | null
   baseUrl?: string
+  subjectPrefix?: string
 }) {
   const cleanBaseUrl = (
     input.baseUrl ||
@@ -844,10 +856,12 @@ export async function sendLicenseDeliveryEmail(input: {
     }
   }
 
+  const subject = `${input.subjectPrefix || ''}🔑 Tu Licencia Krono (${input.licenseKey}) + Despliegue en 1 Clic`
+
   let { data, error } = await resend.emails.send({
     from: DEFAULT_FROM,
     to: input.buyerEmail,
-    subject: `🔑 Tu Licencia Krono (${input.licenseKey}) + Despliegue en 1 Clic`,
+    subject,
     html,
   })
 
@@ -855,7 +869,7 @@ export async function sendLicenseDeliveryEmail(input: {
     const fallbackSend = await resend.emails.send({
       from: 'Krono Citas <onboarding@resend.dev>',
       to: input.buyerEmail,
-      subject: `🔑 Tu Licencia Krono (${input.licenseKey}) + Despliegue en 1 Clic`,
+      subject,
       html,
     })
     if (!fallbackSend.error) {
@@ -1040,7 +1054,7 @@ export async function sendAppointmentRescheduleNoticeEmail(
   const ownerEmail =
     cleanOwnerEmail ||
     process.env.OWNER_NOTIFICATION_EMAIL?.trim() ||
-    '[correo eliminado]'
+    null
 
   if (ownerEmail) {
     const ownerNoticeHtml = renderEmailShell({

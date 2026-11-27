@@ -5,11 +5,36 @@ import {
   verifyLicenseServer,
 } from '@/lib/license'
 import { getAdminSessionStatus } from '@/lib/admin-auth'
+import {
+  checkPersistentRateLimit,
+  getClientIp,
+  rateLimitHeaders,
+} from '@/lib/rate-limit'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-license-verify-secret',
+}
+
+// Margen amplio: las instalaciones cliente consultan este endpoint con frecuencia
+const VERIFY_MAX_PER_IP = 600
+const VERIFY_WINDOW_SECONDS = 10 * 60
+
+async function enforceVerifyRateLimit(
+  request: NextRequest
+): Promise<NextResponse | null> {
+  const limit = await checkPersistentRateLimit({
+    key: `license-verify:ip:${getClientIp(request)}`,
+    maxRequests: VERIFY_MAX_PER_IP,
+    windowSeconds: VERIFY_WINDOW_SECONDS,
+  })
+  if (limit.allowed) return null
+
+  return NextResponse.json(
+    { error: 'Demasiadas verificaciones. Inténtalo de nuevo en unos minutos.' },
+    { status: 429, headers: { ...corsHeaders, ...rateLimitHeaders(limit) } }
+  )
 }
 
 export async function OPTIONS() {
@@ -19,8 +44,11 @@ export async function OPTIONS() {
   })
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const limited = await enforceVerifyRateLimit(request)
+    if (limited) return limited
+
     const session = await getAdminSessionStatus()
     const trustedDomain = resolveTrustedDeploymentDomain()
 
@@ -56,13 +84,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const limited = await enforceVerifyRateLimit(request)
+    if (limited) return limited
+
     const body = (await request.json().catch(() => ({}))) as {
       licenseKey?: string
       domain?: string
       bindDomain?: boolean
     }
 
-    if (!body.licenseKey) {
+    if (typeof body.licenseKey !== 'string' || !body.licenseKey.trim()) {
       return NextResponse.json(
         { error: 'Debes proporcionar una clave de licencia (licenseKey).' },
         { status: 400, headers: corsHeaders }

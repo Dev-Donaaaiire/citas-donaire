@@ -102,7 +102,7 @@ export function BookingConfirmation({
             )}
             {emailStatus === 'queued' && (
               <span className="text-emerald-300">
-                Enviando confirmación e invitación .ics a{' '}
+                Recibirás la confirmación e invitación .ics en{' '}
                 <strong className="font-mono">{details.clientEmail}</strong>
               </span>
             )}

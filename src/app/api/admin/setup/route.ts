@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/admin-auth'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import type { Database } from '@/types/database.types'
 import { getAdminSetupData } from '@/lib/data/admin-setup'
 import { sanitizeTimeZone } from '@/lib/timezone'
 import { normalizeFormFields, type FormCustomizationSettings } from '@/lib/form-field-rules'
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Upsert business_settings
-    const settingsPayload: Record<string, unknown> = {
+    const settingsPayload: Database['public']['Tables']['business_settings']['Update'] = {
       nombre_negocio: nombreNegocio,
       email_notificaciones: emailNotificaciones,
       direccion,
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
     if (savedSettingsId) {
       let { error: updateErr } = await db
         .from('business_settings')
-        .update(settingsPayload as any)
+        .update(settingsPayload)
         .eq('id', savedSettingsId)
 
       // Fallback si la columna campos_formulario aún no existe en alguna base de datos legada
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
         delete fallbackPayload.campos_formulario
         const fallbackRes = await db
           .from('business_settings')
-          .update(fallbackPayload as any)
+          .update(fallbackPayload)
           .eq('id', savedSettingsId)
         updateErr = fallbackRes.error
       }
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
     } else {
       let { data: created, error: insertErr } = await db
         .from('business_settings')
-        .insert(settingsPayload as any)
+        .insert(settingsPayload)
         .select('id')
         .single()
 
@@ -162,7 +163,7 @@ export async function POST(request: NextRequest) {
         delete fallbackPayload.campos_formulario
         const fallbackRes = await db
           .from('business_settings')
-          .insert(fallbackPayload as any)
+          .insert(fallbackPayload)
           .select('id')
           .single()
         created = fallbackRes.data

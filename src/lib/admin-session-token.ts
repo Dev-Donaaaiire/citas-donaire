@@ -200,11 +200,18 @@ export async function verifyAdminSessionToken(
 export function sanitizeNextAdminPath(rawNext: string | null | undefined): string {
   if (!rawNext) return '/admin'
   const trimmed = rawNext.trim()
+  // Los navegadores tratan "\" como "/" y descartan tabs y saltos de línea
   if (
     !trimmed.startsWith('/') ||
     trimmed.startsWith('//') ||
-    trimmed.startsWith('/admin/login')
+    trimmed.startsWith('/admin/login') ||
+    /[\\\u0000-\u001f\u007f]/.test(trimmed)
   ) {
+    return '/admin'
+  }
+  const base = 'http://internal.invalid'
+  const resolved = new URL(trimmed, base)
+  if (resolved.origin !== base || resolved.pathname.startsWith('//')) {
     return '/admin'
   }
   return trimmed

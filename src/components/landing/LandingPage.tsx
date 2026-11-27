@@ -32,10 +32,10 @@ const TARGET_NICHES = [
 
 const COMPARISON: { row: string; old: string; ours: string }[] = [
   { row: 'Coste en 5 años', old: '500 € (100 €/año)', ours: '14,99 € una sola vez' },
-  { row: 'Cuotas mensuales', old: 'Cada año, para siempre', ours: 'Ninguna · para siempre' },
+  { row: 'Cuotas del software', old: 'Cada año, para siempre', ours: 'Ninguna · pago único' },
   { row: 'Diseño', old: 'Interfaces antiguas, iguales para todos', ours: '3 diseños de lujo intercambiables' },
-  { row: 'Propiedad', old: 'Alquilas: si dejas de pagar, lo pierdes', ours: 'Tuyo al 100%, con tu código' },
-  { row: 'Clientes que no vuelven', old: 'Extra o inexistente', ours: 'Seguimiento automático incluido' },
+  { row: 'Licencia', old: 'Alquilas: si dejas de pagar, lo pierdes', ours: 'De uso para tu negocio, con código fuente (sin reventa ni marca blanca)' },
+  { row: 'Clientes que no vuelven', old: 'Extra o inexistente', ours: 'Detección de inactivos y aviso en un toque' },
   { row: 'Avisos al calendario', old: 'Manual o de pago', ours: 'Google Calendar y .ics en 1 toque' },
 ]
 
@@ -58,26 +58,26 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: 'Escudo anti no-show + bloqueo atómico',
-    text: 'Bloquea en servidor a quien deja plantado tu sillón o camilla e impide dobles reservas concurrentes a nivel de PostgreSQL.',
+    text: 'Bloquea en servidor a quien acumula dos plantones e impide dobles reservas concurrentes a nivel de PostgreSQL.',
   },
 ] as const
 
-const VERIFIABLE_CASES = [
+const EXAMPLE_CASES = [
   {
     niche: 'Barbería · Ticket medio 25 €',
-    metric: '+175 €/mes',
+    metric: '+125 €/mes',
     headline: 'Menos huecos muertos en horas valle',
     detail:
-      'Solo recuperando 1 cliente cada semana desde el listado de +30 días sin visita y evitando 1 doble reserva al mes, el sistema se amortiza más de 10 veces el primer mes.',
+      'Supuesto: 4 clientes recuperados al mes (1 por semana) desde el listado de +30 días sin visita y 1 doble reserva evitada, a 25 € cada uno. Tu resultado puede ser distinto.',
     verifyHref: '/demo/admin',
     verifyLabel: 'Ver módulo de retención en vivo',
   },
   {
     niche: 'Clínica / Fisioterapia · 45 €/sesión',
     metric: '485,01 €',
-    headline: 'Ahorro real en 5 años frente a SaaS',
+    headline: 'Ahorro estimado en 5 años frente a SaaS',
     detail:
-      'Dejas de pagar 100 €/año por plataformas que ponen su marca por encima de la tuya y suben tarifas cada temporada. Infraestructura en capas gratuitas de Vercel y Supabase.',
+      'Cálculo: 500 € (cuota supuesta de 100 €/año) menos 14,99 € de licencia. No incluye alojamiento, dominio ni otros servicios externos.',
     verifyHref: '/demo',
     verifyLabel: 'Probar flujo de cita clínica',
   },
@@ -96,7 +96,7 @@ const PLAN_1_FEATURES = [
   'Licencia vitalicia de uso comercial para tu negocio',
   'Los 3 diseños exclusivos (Dark Luxury, Clean Minimal, Neon Creator)',
   'Motor anti doble-reserva en PostgreSQL + panel /admin con retención +30d',
-  'Código fuente Next.js 16 completo + guía paso a paso en capas gratuitas',
+  'Código fuente Next.js 16 completo + guía de instalación paso a paso',
 ]
 
 const PLAN_2_FEATURES = [
@@ -114,7 +114,7 @@ const FAQ_ITEMS = [
   },
   {
     q: '¿De verdad no hay cuotas mensuales por usar Krono / Donaire Citas?',
-    a: 'No nos pagas ni una sola cuota recurrente. El software es un pago único y se despliega en tus propias cuentas gratuitas de Vercel (Hobby), Supabase (hasta 500 MB de base de datos, más que suficiente para miles de citas) y Resend (hasta 3.000 correos al mes). Tus únicos costes externos opcionales son tu dominio propio (~10 €/año) si deseas emails corporativos.',
+    a: 'No nos pagas ninguna cuota recurrente: el software es un pago único y se despliega en tus propias cuentas. La base de datos (Supabase, hasta 500 MB) y el email (Resend, hasta 3.000 correos al mes) tienen capas gratuitas. El alojamiento debes elegirlo en un plan que permita uso comercial según las condiciones del proveedor (el plan Hobby de Vercel no lo permite), así que puede tener coste. A esto se suma tu dominio propio (~10 €/año) si deseas enviar emails con tu marca.',
   },
   {
     q: '¿En qué se diferencia exactamente el plan de 14,99 € del de 99 € Llave en Mano?',
@@ -203,7 +203,7 @@ export function LandingPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-zinc-900 px-3 py-1.5 font-mono text-xs text-emerald-400">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Pago único · 0 €/mes en cuotas
+                  Pago único · Sin cuotas del software
                 </span>
                 <span className="inline-flex items-center rounded-full border border-white/10 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-300">
                   Hecho para el enlace de tu bio en Instagram
@@ -220,8 +220,8 @@ export function LandingPage() {
 
               <p className="max-w-xl text-base leading-relaxed text-zinc-300 sm:text-lg">
                 Sistema propio de reservas para negocios por cita previa con 3 diseños de
-                lujo intercambiables, panel privado anti no-show y recuperación automática
-                de clientes inactivos.
+                lujo intercambiables, panel privado anti no-show y avisos en un toque para
+                recuperar clientes inactivos.
               </p>
 
               {/* Chips de nichos objetivo */}
@@ -318,7 +318,7 @@ export function LandingPage() {
             </div>
           </section>
 
-          {/* PRUEBA SOCIAL / CASOS VERIFICABLES */}
+          {/* EJEMPLOS DE CÁLCULO */}
           <section
             id="casos"
             className="scroll-mt-20 border-t border-white/10 py-16 sm:py-24"
@@ -326,19 +326,19 @@ export function LandingPage() {
             <div className="mx-auto max-w-6xl space-y-10 px-4 sm:px-6">
               <div className="space-y-3 text-center">
                 <p className="font-mono text-xs uppercase tracking-wider text-emerald-400">
-                  Impacto medible sin letra pequeña
+                  Estimaciones orientativas
                 </p>
                 <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                  Números verificables en cualquier negocio de agenda
+                  Ejemplos de cálculo para un negocio de agenda
                 </h2>
                 <p className="mx-auto max-w-2xl text-sm text-zinc-400 sm:text-base">
-                  Haz cuentas reales con tu propio ticket medio y compruébalo directamente
-                  en las demos abiertas antes de gastar un euro.
+                  Son supuestos, no resultados garantizados. Haz las cuentas con tu propio
+                  ticket medio y prueba las funciones en las demos abiertas.
                 </p>
               </div>
 
               <div className="grid gap-5 md:grid-cols-3">
-                {VERIFIABLE_CASES.map((item) => (
+                {EXAMPLE_CASES.map((item) => (
                   <article
                     key={item.headline}
                     className="flex flex-col justify-between rounded-3xl border border-white/10 bg-zinc-900/60 p-6 shadow-sm backdrop-blur-md space-y-5"
@@ -403,7 +403,7 @@ export function LandingPage() {
                       Krono / Donaire Citas
                     </p>
                     <p className="mt-1 text-sm font-semibold text-white">
-                      14,99 € pago único + 3 temas de lujo + 100% tuyo
+                      14,99 € pago único + 3 temas de lujo + código fuente
                     </p>
                   </div>
 
@@ -426,9 +426,12 @@ export function LandingPage() {
 
                 <div className="flex flex-col items-center justify-between gap-3 border-t border-white/10 bg-zinc-950/50 p-5 sm:flex-row">
                   <p className="text-sm text-zinc-300">
-                    Ahorro mínimo en 5 años:{' '}
+                    Ahorro estimado en 5 años:{' '}
                     <span className="font-mono text-lg font-bold text-emerald-400 tabular-nums">
                       485,01 €
+                    </span>
+                    <span className="mt-1 block text-xs text-zinc-400">
+                      Orientativo: sin contar alojamiento, dominio ni otros servicios.
                     </span>
                   </p>
                   <CheckoutTriggerButton
@@ -480,7 +483,7 @@ export function LandingPage() {
 
                     <p className="text-xs text-zinc-400 leading-relaxed">
                       Descarga inmediata de repositorio, esquema PostgreSQL blindado y
-                      licencia vitalicia para desplegarlo tú en tus cuentas gratuitas.
+                      licencia vitalicia de uso para desplegarlo tú en tus propias cuentas.
                     </p>
 
                     <ul className="space-y-3 text-sm text-zinc-300">
@@ -529,8 +532,8 @@ export function LandingPage() {
 
                     <p className="text-xs text-zinc-300 leading-relaxed">
                       Por 84 € adicionales nos encargamos de todo el despliegue en tus
-                      cuentas, DNS del dominio para emails y carga de tu catálogo. Amortizado
-                      en 2–3 citas.
+                      cuentas, DNS del dominio para emails y carga de tu catálogo. Como
+                      referencia, 99 € equivalen a entre 2 y 4 citas de 25–45 €.
                     </p>
 
                     <ul className="space-y-3 text-sm text-zinc-200">

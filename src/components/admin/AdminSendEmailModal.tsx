@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useId, useState, useEffect } from 'react'
+import React, { useId, useState } from 'react'
 import { X, Mail, Send, Loader2, Sparkles, AlertCircle, Calendar, Phone } from 'lucide-react'
 import type { Client } from '@/types/booking'
 import { AccessibleModal } from '@/components/ui/AccessibleModal'
@@ -39,10 +39,24 @@ export function AdminSendEmailModal({
   const firstName = client?.nombre?.trim().split(' ')[0] || 'Cliente'
   const cleanBusiness = businessName.trim() || 'Krono Studio'
 
-  // Generador de plantillas dinámicas según el cliente seleccionado
-  useEffect(() => {
-    if (!client) return
+  // Generador de plantillas dinámicas según el cliente seleccionado.
+  // Se ajusta durante el render cuando cambia cliente, plantilla o negocio.
+  const [draftSource, setDraftSource] = useState<{
+    client: Client | null
+    template: TemplateType
+    business: string
+  } | null>(null)
 
+  const isDraftStale =
+    draftSource?.client !== client ||
+    draftSource.template !== activeTemplate ||
+    draftSource.business !== cleanBusiness
+
+  if (isDraftStale) {
+    setDraftSource({ client, template: activeTemplate, business: cleanBusiness })
+  }
+
+  if (isDraftStale && client) {
     setErrorMessage(null)
 
     if (activeTemplate === 'reactivation') {
@@ -67,7 +81,7 @@ export function AdminSendEmailModal({
           `Esperamos que estés teniendo una excelente semana. Nos ponemos en contacto contigo desde ${cleanBusiness} para...`
       )
     }
-  }, [client, activeTemplate, firstName, cleanBusiness])
+  }
 
   if (!client) return null
 

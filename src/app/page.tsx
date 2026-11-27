@@ -19,11 +19,11 @@ export async function generateMetadata(): Promise<Metadata> {
     return {
       title: 'Krono / Donaire Citas · Reservas online por 14,99 € pago único',
       description:
-        'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y cero cuotas mensuales.',
+        'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y sin cuotas mensuales del software.',
       openGraph: {
         title: 'Krono / Donaire Citas · Reservas online por 14,99 € pago único',
         description:
-          'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y cero cuotas mensuales.',
+          'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y sin cuotas mensuales del software.',
         type: 'website',
         locale: 'es_ES',
         siteName: 'Krono / Donaire Citas',
@@ -32,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
         card: 'summary_large_image',
         title: 'Krono / Donaire Citas · Reservas online por 14,99 € pago único',
         description:
-          'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y cero cuotas mensuales.',
+          'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y sin cuotas mensuales del software.',
       },
     }
   }
@@ -40,7 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const initialData = await getPublicBookingInitialData({ isDemoRoute: false })
   const businessName = initialData.settings.nombre_negocio || 'Krono Studio'
   const title = `Reservar Cita Online | ${businessName}`
-  const description = `Elige tu servicio y reserva tu cita en segundos en ${businessName}. Confirmación instantánea y recordatorios automáticos.`
+  const description = `Elige tu servicio y reserva tu cita en segundos en ${businessName}. Confirmación instantánea y cita para tu calendario.`
 
   return {
     title,

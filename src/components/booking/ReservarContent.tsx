@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useLayoutEffect } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -107,26 +107,26 @@ export function ReservarContent({
   const [confirmationDetails, setConfirmationDetails] =
     useState<BookingConfirmationDetails | null>(null)
 
-  useEffect(() => {
-    if (rescheduleToken) {
-      setConfirmationDetails(null)
-      setSelectedSlot(null)
-      setSubmitError(null)
-      setEmailStatus('idle')
-      if (initialServiceId) {
-        const found = bookingData.services.find((s) => s.id === initialServiceId)
-        if (found) setSelectedService(found)
-      }
-      setStep(2)
-    }
-  }, [rescheduleToken, initialServiceId, bookingData.services])
-
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [emailStatus, setEmailStatus] = useState<
     'idle' | 'sending' | 'queued' | 'sent' | 'simulated' | 'error'
   >('idle')
+
+  // Con cacheComponents la ruta se oculta (Activity) en vez de desmontarse:
+  // al salir de una reprogramación se limpia el flujo para volver siempre al paso 2.
+  useLayoutEffect(() => {
+    if (!rescheduleToken) return
+    return () => {
+      setConfirmationDetails(null)
+      setSelectedSlot(null)
+      setSubmitError(null)
+      setEmailStatus('idle')
+      setSelectedService(null) // vuelve al servicio preseleccionado
+      setStep(2)
+    }
+  }, [rescheduleToken])
 
   const settings = bookingData.settings
   const services = bookingData.services

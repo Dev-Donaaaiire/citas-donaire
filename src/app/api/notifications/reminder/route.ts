@@ -51,6 +51,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!client.email || client.email.endsWith('@citas.local')) {
+      return NextResponse.json(
+        { error: 'Este cliente no tiene correo electrónico registrado.' },
+        { status: 400 }
+      )
+    }
+
     if (client.bloqueado_no_show) {
       return NextResponse.json(
         {

@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Carpetas de herramientas de agentes (no son código de la app):
+    ".agents/**",
+    ".antigravity_mcp_config/**",
+    ".claude/**",
+    ".cursor/**",
   ]),
 ]);
 

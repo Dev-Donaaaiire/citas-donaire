@@ -259,7 +259,7 @@ export function AdminHeader({
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-mono truncate">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-400 font-mono">
               <span>Gestión de Agenda &amp; Retención · {settings?.timezone || 'Europe/Madrid'}</span>
               <button
                 type="button"

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { CURRENT_SYSTEM_VERSION, UPSTREAM_GITHUB_REPO } from '@/lib/version'
+import { UPSTREAM_GITHUB_REPO } from '@/lib/version'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

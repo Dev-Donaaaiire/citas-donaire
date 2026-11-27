@@ -18,10 +18,7 @@ import {
   formatDateFull,
   getDaysSince,
 } from '@/lib/format'
-import {
-  sendRetentionReminder,
-  toggleClientBlacklist,
-} from '@/lib/booking-service'
+import { toggleClientBlacklist } from '@/lib/booking-service'
 import { AdminSendEmailModal } from '@/components/admin/AdminSendEmailModal'
 import { cn } from '@/lib/utils'
 import { useFeedback } from '@/components/ui/FeedbackProvider'
@@ -155,10 +152,7 @@ export function AdminClientRetentionTable({
     window.open(waUrl, '_blank', 'noopener,noreferrer')
   }
 
-  const handleEmailSuccess = (
-    client: Client,
-    result: { simulated?: boolean; warning?: string }
-  ) => {
+  const handleEmailSuccess = (client: Client) => {
     setEmailedIds((prev) => ({ ...prev, [client.id]: true }))
     if (emailTimersRef.current[client.id]) {
       window.clearTimeout(emailTimersRef.current[client.id])

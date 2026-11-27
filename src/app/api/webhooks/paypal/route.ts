@@ -66,6 +66,50 @@ function getPayPalApiBase(): string {
     : 'https://api-m.paypal.com'
 }
 
+/**
+ * Los eventos de captura no siempre incluyen al comprador: se consulta la orden
+ * en la API de PayPal. Devuelve null si no se puede obtener.
+ */
+async function fetchOrderBuyerEmail(orderId: string): Promise<string | null> {
+  const clientId = process.env.PAYPAL_CLIENT_ID?.trim()
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET?.trim()
+  if (!clientId || !clientSecret) return null
+
+  const base = getPayPalApiBase()
+  const tokenRes = await fetch(`${base}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+    cache: 'no-store',
+  })
+  if (!tokenRes.ok) throw new Error('PayPal OAuth no disponible.')
+  const { access_token } = (await tokenRes.json()) as { access_token?: string }
+
+  const orderRes = await fetch(
+    `${base}/v2/checkout/orders/${encodeURIComponent(orderId)}`,
+    {
+      headers: { Authorization: `Bearer ${access_token}` },
+      cache: 'no-store',
+    }
+  )
+  if (orderRes.status === 404) return null
+  // Fallo temporal: se lanza para que PayPal reintente el webhook
+  if (!orderRes.ok) throw new Error(`PayPal orders: ${orderRes.status}`)
+
+  const order = (await orderRes.json()) as {
+    payer?: { email_address?: string }
+    payment_source?: { paypal?: { email_address?: string } }
+  }
+  return (
+    order.payer?.email_address ||
+    order.payment_source?.paypal?.email_address ||
+    null
+  )
+}
+
 function resolvePublicAppUrl(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ||
@@ -75,19 +119,13 @@ function resolvePublicAppUrl(): string {
 
 async function verifyPayPalWebhookSignature(
   request: NextRequest,
-  webhookEvent: PayPalWebhookEvent
+  rawBody: string
 ): Promise<{ valid: boolean; status: 400 | 401; error?: string }> {
   const webhookId = process.env.PAYPAL_WEBHOOK_ID?.trim()
   const clientId = process.env.PAYPAL_CLIENT_ID?.trim()
   const clientSecret = process.env.PAYPAL_CLIENT_SECRET?.trim()
 
   if (!webhookId || !clientId || !clientSecret) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(
-        '[webhooks/paypal] Modo desarrollo/test: credenciales de PayPal no configuradas, omitiendo verificación criptográfica para pruebas y auditoría QA.'
-      )
-      return { valid: true, status: 400 }
-    }
     return {
       valid: false,
       status: 401,
@@ -102,10 +140,6 @@ async function verifyPayPalWebhookSignature(
   const transmissionSig = request.headers.get('paypal-transmission-sig')?.trim()
   const transmissionTime = request.headers.get('paypal-transmission-time')?.trim()
 
-  const isSandbox =
-    process.env.PAYPAL_ENV?.trim().toLowerCase() === 'sandbox' ||
-    process.env.NODE_ENV !== 'production'
-
   if (
     !authAlgo ||
     !certUrl ||
@@ -113,12 +147,6 @@ async function verifyPayPalWebhookSignature(
     !transmissionSig ||
     !transmissionTime
   ) {
-    if (isSandbox) {
-      console.warn(
-        '[webhooks/paypal] Modo sandbox/test: omitiendo verificación de cabeceras de firma ausentes.'
-      )
-      return { valid: true, status: 400 }
-    }
     return {
       valid: false,
       status: 400,
@@ -169,15 +197,15 @@ async function verifyPayPalWebhookSignature(
         Authorization: `Bearer ${tokenData.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      // El evento se reenvía tal cual llegó: reserializarlo puede invalidar la firma
+      body: `${JSON.stringify({
         auth_algo: authAlgo,
         cert_url: certUrl,
         transmission_id: transmissionId,
         transmission_sig: transmissionSig,
         transmission_time: transmissionTime,
         webhook_id: webhookId,
-        webhook_event: webhookEvent,
-      }),
+      }).slice(0, -1)},"webhook_event":${rawBody}}`,
       cache: 'no-store',
     }
   )
@@ -195,12 +223,6 @@ async function verifyPayPalWebhookSignature(
   }
 
   if (verifyData.verification_status !== 'SUCCESS') {
-    if (process.env.PAYPAL_ENV?.trim().toLowerCase() === 'sandbox') {
-      console.warn(
-        '[webhooks/paypal] Modo sandbox: omitiendo fallo de verificación para pruebas de simulador PayPal.'
-      )
-      return { valid: true, status: 400 }
-    }
     return {
       valid: false,
       status: 401,
@@ -225,7 +247,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const sigCheck = await verifyPayPalWebhookSignature(request, event)
+    const sigCheck = await verifyPayPalWebhookSignature(request, rawBody)
     if (!sigCheck.valid) {
       return NextResponse.json(
         { error: sigCheck.error },
@@ -290,12 +312,18 @@ export async function POST(request: NextRequest) {
     const plan: LicensePlan =
       amountEur >= 99 ? 'llave_en_mano_99' : 'autoinstalable_15'
 
-    const buyerEmail =
+    const orderId = resource.supplementary_data?.related_ids?.order_id
+    let buyerEmail =
       resource.payer?.email_address ||
       resource.payment_source?.paypal?.email_address ||
       resource.subscriber?.email_address ||
-      (isSandbox ? process.env.OWNER_NOTIFICATION_EMAIL?.trim() : null) ||
-      null
+      (orderId ? await fetchOrderBuyerEmail(orderId) : null)
+
+    // Sin email del comprador, la licencia llega al vendedor para que la reenvíe
+    const needsForwarding = !buyerEmail || !buyerEmail.includes('@')
+    if (needsForwarding) {
+      buyerEmail = process.env.OWNER_NOTIFICATION_EMAIL?.trim() || null
+    }
 
     if (!buyerEmail || !buyerEmail.includes('@')) {
       return NextResponse.json(
@@ -313,12 +341,17 @@ export async function POST(request: NextRequest) {
       .trim()
 
     // Normaliza siempre al order_id para que un mismo pago nunca genere dos sesiones distintas
-    const paymentId = `paypal:${
+    const sessionRef =
       resource.supplementary_data?.related_ids?.order_id ||
       resource.id ||
-      event.id ||
-      Date.now()
-    }`
+      event.id
+    if (!sessionRef) {
+      return NextResponse.json(
+        { error: 'El evento de PayPal no incluye identificador de pago.' },
+        { status: 400 }
+      )
+    }
+    const paymentId = `paypal:${sessionRef}`
 
     const { license, alreadyExisted } =
       await issueOrGetLicenseForPaymentSession({
@@ -328,7 +361,6 @@ export async function POST(request: NextRequest) {
       })
 
     let emailResult = { success: false, simulated: false }
-    let emailErrorDetail: string | null = null
     try {
       emailResult = await sendLicenseDeliveryEmail({
         buyerEmail: license.comprador_email,
@@ -337,13 +369,26 @@ export async function POST(request: NextRequest) {
         plan,
         amountCents: Math.round(amountEur * 100),
         baseUrl: resolvePublicAppUrl(),
+        subjectPrefix: needsForwarding
+          ? `[REENVIAR AL COMPRADOR · pago ${paymentId}] `
+          : undefined,
       })
     } catch (emailErr) {
-      emailErrorDetail =
-        emailErr instanceof Error ? emailErr.message : String(emailErr)
       console.error(
         '[webhooks/paypal] Error enviando correo de licencia:',
         emailErr
+      )
+    }
+
+    // Sin entrega real respondemos 503 para que PayPal reintente; la licencia
+    // ya emitida se reutiliza por id de pago, así que no se duplica.
+    if (!emailResult.success || emailResult.simulated) {
+      console.error(
+        `[webhooks/paypal] Licencia emitida sin email entregado (${paymentId}).`
+      )
+      return NextResponse.json(
+        { error: 'No se pudo entregar el correo de la licencia.' },
+        { status: 503 }
       )
     }
 
@@ -352,20 +397,12 @@ export async function POST(request: NextRequest) {
       eventType,
       alreadyExisted,
       plan,
-      licenseKey: license.license_key,
-      emailDelivered: Boolean(emailResult.success && !emailResult.simulated),
-      emailSimulated: Boolean(emailResult.simulated),
-      emailError: emailErrorDetail,
+      emailDelivered: true,
     })
   } catch (err) {
     console.error('[webhooks/paypal] Error:', err)
     return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : 'Error interno al procesar el webhook de PayPal.',
-      },
+      { error: 'Error interno al procesar el webhook de PayPal.' },
       { status: 500 }
     )
   }

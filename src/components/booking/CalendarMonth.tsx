@@ -10,6 +10,7 @@ import {
 import {
   formatDateKey,
   getMonthDaysGrid,
+  MAX_BOOKING_DAYS_AHEAD,
   calculateAvailableSlots,
 } from '@/lib/calendar'
 import {
@@ -71,6 +72,7 @@ export function CalendarMonth({
     month: todayMonthOneNum - 1,
   }
 
+  const maxIso = addDaysToIsoDate(todayIso, MAX_BOOKING_DAYS_AHEAD - 1)
   const selectedKey = formatDateKey(selectedDate, tz)
   const initialSelectedParts = getZonedDateParts(selectedDate, tz)
 
@@ -103,6 +105,10 @@ export function CalendarMonth({
   const isPrevDisabled =
     currentYear < todayParts.year ||
     (currentYear === todayParts.year && currentMonth <= todayParts.month)
+
+  const isNextDisabled =
+    `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}` >=
+    maxIso.slice(0, 7)
 
   const daysGrid = useMemo(
     () => getMonthDaysGrid(currentYear, currentMonth, tz),
@@ -300,8 +306,9 @@ export function CalendarMonth({
             <button
               type="button"
               onClick={handleNextMonth}
+              disabled={isNextDisabled}
               aria-label="Mes siguiente"
-              className="min-w-12 min-h-12 rounded-xl flex items-center justify-center border border-white/10 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors active:scale-[0.98]"
+              className="min-w-12 min-h-12 rounded-xl flex items-center justify-center border border-white/10 text-zinc-300 hover:bg-zinc-800 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -332,7 +339,7 @@ export function CalendarMonth({
             const isPast = key < todayIso
             const info = availabilityMap.get(key)
             const availableCount = info?.availableCount ?? 0
-            const isDisabled = isPast || availableCount === 0
+            const isDisabled = isPast || key > maxIso || availableCount === 0
 
             return (
               <button

@@ -16,7 +16,7 @@ const PLANS: Record<'15' | '99', CheckoutPlan> = {
     id: '15',
     name: 'Código Autoinstalable',
     priceLabel: '14,99 €',
-    subtitle: 'Licencia vitalicia + código fuente Next.js 16 listo para tu Vercel y Supabase gratis.',
+    subtitle: 'Licencia vitalicia de uso + código fuente Next.js 16 para desplegar en tus propias cuentas.',
     href: CHECKOUT_URL_AUTOINSTALABLE,
   },
   '99': {

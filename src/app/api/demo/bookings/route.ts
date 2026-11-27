@@ -15,7 +15,6 @@ import { isDbDemoModeActive } from '@/lib/demo-guard'
 import {
   addDemoSandboxBooking,
   DEMO_SANDBOX_COOKIE_NAME,
-  DEMO_SANDBOX_SERVICES,
   DEMO_SANDBOX_SETTINGS,
 } from '@/lib/demo-sandbox'
 

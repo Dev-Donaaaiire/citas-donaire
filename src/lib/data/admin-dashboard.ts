@@ -11,6 +11,7 @@ import {
   getDemoSandboxAdminDataset,
 } from '@/lib/demo-sandbox'
 import { normalizeFormFields } from '@/lib/form-field-rules'
+import { isDbDemoModeActive } from '@/lib/demo-guard'
 import type {
   Appointment,
   BlockedSlot,
@@ -183,9 +184,9 @@ export async function getAdminDashboardData(options?: {
     .limit(1)
     .maybeSingle()
 
-  // Si es /demo/admin y la BD está en modo producción real (modo_demo = false),
-  // jamás leemos datos de clientes reales ni permitimos mutaciones sobre BD real.
-  if (demoRoute && settingsRow && !settingsRow.modo_demo) {
+  // /demo/admin solo lee la BD real con ALLOW_PUBLIC_DEMO_DB y modo_demo activo;
+  // en cualquier otro caso usa el sandbox para no exponer datos de clientes.
+  if (demoRoute && !(await isDbDemoModeActive())) {
     const deltaCookie = await resolveSandboxDelta()
     const sandbox = getDemoSandboxAdminDataset(deltaCookie)
     return {
@@ -550,7 +551,7 @@ export async function createBlockedSlotServer(params: {
           duracion_minutos: number
         } | null
 
-        if (!client?.email) continue
+        if (!client?.email || client.email.endsWith('@citas.local')) continue
 
         affectedCount += 1
         const rescheduleUrl = `${cleanBaseUrl}/reservar?rescheduleToken=${encodeURIComponent(

@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const initialData = await getPublicBookingInitialData({ isDemoRoute: false })
   const businessName = initialData.settings.nombre_negocio || 'Krono Studio'
   const title = `Reservar Cita Online | ${businessName}`
-  const description = `Elige tu servicio y reserva tu cita en segundos en ${businessName}. Confirmación instantánea y recordatorios automáticos.`
+  const description = `Elige tu servicio y reserva tu cita en segundos en ${businessName}. Confirmación instantánea y cita para tu calendario.`
 
   return {
     title,

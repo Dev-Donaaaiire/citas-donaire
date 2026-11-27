@@ -11,7 +11,11 @@ import {
   normalizeWorkingDays,
   sanitizeTimeZone,
 } from '@/lib/timezone'
-import { timeStringToMinutes } from '@/lib/calendar'
+import {
+  MAX_BOOKING_DAYS_AHEAD,
+  calculateAvailableSlots,
+  timeStringToMinutes,
+} from '@/lib/calendar'
 import type {
   Appointment,
   BusinessPublicSettings,
@@ -23,6 +27,8 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+
 
 export class BookingApiError extends Error {
   status: number
@@ -106,6 +112,14 @@ export async function createServerBooking(
       'No se pueden confirmar reservas para horarios pasados o inmediatos.',
       400,
       'PAST_SLOT'
+    )
+  }
+
+  if (startDate.getTime() > Date.now() + MAX_BOOKING_DAYS_AHEAD * 86_400_000) {
+    throw new BookingApiError(
+      `Solo se admiten reservas con un máximo de ${MAX_BOOKING_DAYS_AHEAD} días de antelación.`,
+      400,
+      'TOO_FAR_AHEAD'
     )
   }
 
@@ -260,6 +274,21 @@ export async function createServerBooking(
     )
   }
 
+  // La hora debe ser uno de los huecos que ofrece el calendario público
+  const isOfferedSlot = calculateAvailableSlots({
+    date: zonedStart.isoDate,
+    serviceDurationMinutes: serviceRow.duracion_minutos,
+    settings: settingsRow,
+  }).some((slot) => slot.datetime === startIso)
+
+  if (!isOfferedSlot) {
+    throw new BookingApiError(
+      'La hora seleccionada no es un hueco disponible. Actualiza la página y elige otra.',
+      400,
+      'INVALID_SLOT'
+    )
+  }
+
   // 4. Comprobar bloqueos de agenda
   const { data: overlappingBlocks, error: blocksError } = await db
     .from('blocked_slots')
@@ -350,12 +379,28 @@ export async function createServerBooking(
     }
 
     if (existingClient) {
-      const { data: updatedClient, error: updateClientErr } = await db
-        .from('clients')
-        .update({ nombre: effectiveNombre, telefono: effectivePhone })
-        .eq('id', existingClient.id)
-        .select('*')
-        .single()
+      // Una reserva pública no sobrescribe datos existentes: solo rellena vacíos
+      const missingData: { nombre?: string; telefono?: string } = {}
+      const storedName = existingClient.nombre?.trim()
+      if (
+        (!storedName || storedName === 'Cliente') &&
+        effectiveNombre !== storedName
+      ) {
+        missingData.nombre = effectiveNombre
+      }
+      if (!existingClient.telefono?.trim() && effectivePhone) {
+        missingData.telefono = effectivePhone
+      }
+
+      const { data: updatedClient, error: updateClientErr } =
+        Object.keys(missingData).length === 0
+          ? { data: existingClient, error: null }
+          : await db
+              .from('clients')
+              .update(missingData)
+              .eq('id', existingClient.id)
+              .select('*')
+              .single()
 
       if (updateClientErr || !updatedClient) {
         throw new BookingApiError(
@@ -416,13 +461,15 @@ export async function createServerBooking(
 
   let preCancelledForOverlap = false
   if (rescheduleApt && overlapsReschedule) {
-    const { error: tempCancelErr } = await db
+    const { data: released, error: tempCancelErr } = await db
       .from('appointments')
       .update({ estado: 'cancelada' })
       .eq('id', rescheduleApt.id)
       .eq('estado', 'confirmada')
+      .select('id')
 
-    if (tempCancelErr) {
+    // Sin filas afectadas: otra petición simultánea ya usó este token
+    if (tempCancelErr || !released?.length) {
       throw new BookingApiError(
         'No se pudo liberar temporalmente el hueco original para reprogramar.',
         409,
@@ -475,16 +522,32 @@ export async function createServerBooking(
 
   // Si es reprogramación sin solape previo, cancelar la cita antigua SOLO tras confirmar la nueva
   if (rescheduleApt && !preCancelledForOverlap) {
-    const { error: cancelOldErr } = await db
+    const { data: replaced, error: cancelOldErr } = await db
       .from('appointments')
       .update({ estado: 'cancelada' })
       .eq('id', rescheduleApt.id)
       .eq('estado', 'confirmada')
+      .select('id')
 
-    if (cancelOldErr) {
-      console.error(
-        '[createServerBooking] Advertencia al anular cita antigua en reprogramación:',
-        cancelOldErr
+    // Solo una reprogramación simultánea puede anular la cita antigua;
+    // la que pierde deshace su cita nueva para no duplicar.
+    if (cancelOldErr || !replaced?.length) {
+      const { error: rollbackErr } = await db
+        .from('appointments')
+        .delete()
+        .eq('id', insertedAppointment.id)
+
+      if (cancelOldErr || rollbackErr) {
+        console.error(
+          '[createServerBooking] Error en reprogramación:',
+          cancelOldErr || rollbackErr
+        )
+      }
+
+      throw new BookingApiError(
+        'No se pudo cambiar la cita: puede que ya se haya modificado. Revisa tu correo.',
+        409,
+        'RESCHEDULE_CONFLICT'
       )
     }
   }
@@ -517,9 +580,9 @@ export async function createServerBooking(
     serviceName: serviceRow.nombre,
     servicePrice: Number(serviceRow.precio),
     durationMinutes: serviceRow.duracion_minutos,
-    clientName: clientRow.nombre,
+    clientName: effectiveNombre,
     clientEmail: effectiveEmail || '',
-    clientPhone: clientRow.telefono,
+    clientPhone: effectivePhone,
     notes: effectiveNotas,
     startIso,
     endIso,
@@ -558,7 +621,7 @@ export async function createServerBooking(
       service: serviceRow,
       client: {
         id: clientRow.id,
-        nombre: clientRow.nombre,
+        nombre: effectiveNombre,
       },
       businessSettings,
       rescheduled: Boolean(rescheduleApt),

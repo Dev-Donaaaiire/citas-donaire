@@ -23,6 +23,7 @@ import {
   zonedDateTimeToUtc,
 } from '@/lib/timezone'
 import { normalizeFormFields } from '@/lib/form-field-rules'
+import { isPublicDemoDbAllowed } from '@/lib/demo-guard'
 
 export interface PublicBookingInitialData {
   services: Service[]
@@ -119,9 +120,13 @@ const fetchPublicBookingInitialData = cache(
       services = servicesRes.data ?? []
     }
 
-    // Si estamos en /demo pero la BD ya está en producción real (modo_demo = false),
-    // aislamos completamente /demo con el sandbox en memoria para no leer datos reales.
-    if (isDemoRoute && settings && !settings.modo_demo) {
+    // /demo solo usa la BD real con ALLOW_PUBLIC_DEMO_DB y modo_demo activo;
+    // si no, se aísla con el sandbox en memoria para no leer datos reales.
+    if (
+      isDemoRoute &&
+      settings &&
+      (!settings.modo_demo || !isPublicDemoDbAllowed())
+    ) {
       return {
         services: DEMO_SANDBOX_SERVICES,
         settings: DEMO_SANDBOX_SETTINGS,

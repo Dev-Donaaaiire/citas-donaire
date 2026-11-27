@@ -64,6 +64,9 @@ type SettingsForSlots = Pick<
   timezone?: string | null
 }
 
+/** Antelación máxima admitida para una reserva pública. */
+export const MAX_BOOKING_DAYS_AHEAD = 180
+
 /**
  * Calcula los slots disponibles para un día concreto y duración de servicio,
  * interpretando siempre horarios y días en la zona horaria configurada del negocio.

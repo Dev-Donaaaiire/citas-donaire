@@ -44,7 +44,7 @@ export const FORM_FIELD_RULES: FieldRuleDefinition[] = [
       'Sin confirmación digital inmediata: el cliente no recibe el email con la hora y fecha de la reserva.',
       'Sin cancelación ni reprogramación autónoma: el cliente no tendrá el enlace web para cambiar o anular su cita y tendrá que llamarte.',
       'Sin avisos automáticos si bloqueas su cita: si marcas un día como festivo o bloqueado, el sistema no podrá notificarle automáticamente para que elija otra fecha.',
-      'Sin recordatorios automáticos por email: mayor probabilidad de que el cliente olvide asistir a la cita.',
+      'Sin recordatorios por email: mayor probabilidad de que el cliente olvide asistir a la cita.',
     ],
     lostFunctionsWhenDisabled: [
       'Se oculta totalmente el campo en el formulario.',

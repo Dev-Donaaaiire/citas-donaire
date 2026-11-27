@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Sparkles, ArrowRight, RefreshCw, X } from 'lucide-react'
+import { Sparkles, ArrowRight, X } from 'lucide-react'
 import type { SystemVersionInfo } from '@/lib/version'
 import { AdminUpdateModal } from '@/components/admin/AdminUpdateModal'
 

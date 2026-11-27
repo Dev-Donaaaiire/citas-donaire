@@ -41,11 +41,7 @@ ALTER TABLE public.business_settings
   ADD COLUMN IF NOT EXISTS direccion TEXT,
   ADD COLUMN IF NOT EXISTS telefono_contacto TEXT,
   ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Europe/Madrid',
-  ADD COLUMN IF NOT EXISTS campos_formulario JSONB DEFAULT '{"nombre":{"activo":true,"requerido":true},"email":{"activo":true,"requerido":true},"telefono":{"activo":true,"requerido":true},"notas":{"activo":true,"requerido":false}}'::jsonb;
-
-ALTER TABLE public.clients
-  ALTER COLUMN email DROP NOT NULL,
-  ALTER COLUMN telefono DROP NOT NULL;
+  ADD COLUMN IF NOT EXISTS campos_formulario JSONB NOT NULL DEFAULT '{"nombre":{"activo":true,"requerido":true},"email":{"activo":true,"requerido":true},"telefono":{"activo":true,"requerido":true},"notas":{"activo":true,"requerido":false}}'::jsonb;
 
 DROP TRIGGER IF EXISTS trg_business_settings_updated_at ON public.business_settings;
 CREATE TRIGGER trg_business_settings_updated_at
@@ -61,8 +57,15 @@ CREATE TABLE IF NOT EXISTS public.services (
   precio NUMERIC(10, 2) NOT NULL CHECK (precio >= 0),
   activo BOOLEAN NOT NULL DEFAULT true,
   orden INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  descripcion TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.services
+  ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS descripcion TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_services_activo_orden ON public.services(activo, orden);
 
@@ -70,14 +73,26 @@ CREATE INDEX IF NOT EXISTS idx_services_activo_orden ON public.services(activo, 
 CREATE TABLE IF NOT EXISTS public.clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  telefono TEXT NOT NULL,
+  email TEXT UNIQUE,
+  telefono TEXT,
   total_citas INTEGER NOT NULL DEFAULT 0 CHECK (total_citas >= 0),
   no_shows INTEGER NOT NULL DEFAULT 0 CHECK (no_shows >= 0),
   bloqueado_no_show BOOLEAN NOT NULL DEFAULT false,
   ultima_visita TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  notas TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.clients
+  ADD COLUMN IF NOT EXISTS no_shows INTEGER NOT NULL DEFAULT 0 CHECK (no_shows >= 0),
+  ADD COLUMN IF NOT EXISTS notas TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Permite reservar sin email o sin teléfono si el negocio los marca como opcionales
+ALTER TABLE public.clients
+  ALTER COLUMN email DROP NOT NULL,
+  ALTER COLUMN telefono DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_clients_email ON public.clients(email);
 CREATE INDEX IF NOT EXISTS idx_clients_ultima_visita ON public.clients(ultima_visita);
@@ -94,8 +109,35 @@ CREATE TABLE IF NOT EXISTS public.appointments (
   token_cancelacion UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
   notas TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (fecha_hora_fin > fecha_hora_inicio)
 );
+
+ALTER TABLE public.appointments
+  ADD COLUMN IF NOT EXISTS notas TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Admitir el estado 'no_show' en instalaciones antiguas
+DO $$
+DECLARE
+  chk RECORD;
+BEGIN
+  FOR chk IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'public.appointments'::regclass
+      AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%estado%'
+      AND conname <> 'appointments_no_overlap'
+  LOOP
+    EXECUTE format('ALTER TABLE public.appointments DROP CONSTRAINT IF EXISTS %I', chk.conname);
+  END LOOP;
+
+  ALTER TABLE public.appointments
+    ADD CONSTRAINT appointments_estado_check
+    CHECK (estado IN ('confirmada', 'cancelada', 'completada', 'no_show'));
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_appointments_inicio ON public.appointments(fecha_hora_inicio);
 CREATE INDEX IF NOT EXISTS idx_appointments_client_id ON public.appointments(client_id);
@@ -125,8 +167,12 @@ CREATE TABLE IF NOT EXISTS public.blocked_slots (
   fecha_fin TIMESTAMPTZ NOT NULL,
   motivo TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (fecha_fin > fecha_inicio)
 );
+
+ALTER TABLE public.blocked_slots
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_blocked_slots_fechas ON public.blocked_slots(fecha_inicio, fecha_fin);
 
@@ -139,10 +185,71 @@ CREATE TABLE IF NOT EXISTS public.licenses (
     CHECK (plan IN ('autoinstalable_15', 'llave_en_mano_99')),
   dominio_autorizado TEXT,
   activa BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  stripe_session_id TEXT,
+  fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE public.licenses
+  ADD COLUMN IF NOT EXISTS stripe_session_id TEXT,
+  ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'licenses_license_key_check'
+      AND conrelid = 'public.licenses'::regclass
+  ) THEN
+    ALTER TABLE public.licenses
+      ADD CONSTRAINT licenses_license_key_check
+      CHECK (license_key ~ '^DONAIRE-[A-Z0-9]{4}-[A-Z0-9]{4}(-[A-Z0-9]{4})?$') NOT VALID;
+  END IF;
+
+  -- Una sola licencia por pago (se omite si ya hay duplicados que revisar a mano)
+  BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_licenses_payment_session_unique
+      ON public.licenses(stripe_session_id)
+      WHERE stripe_session_id IS NOT NULL;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'Hay licencias duplicadas por pago: revisalas y vuelve a crear el indice.';
+  END;
+END
+$$;
+
 CREATE INDEX IF NOT EXISTS idx_licenses_key ON public.licenses(license_key);
+
+DROP TRIGGER IF EXISTS trg_services_updated_at ON public.services;
+CREATE TRIGGER trg_services_updated_at
+  BEFORE UPDATE ON public.services
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trg_clients_updated_at ON public.clients;
+CREATE TRIGGER trg_clients_updated_at
+  BEFORE UPDATE ON public.clients
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trg_appointments_updated_at ON public.appointments;
+CREATE TRIGGER trg_appointments_updated_at
+  BEFORE UPDATE ON public.appointments
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trg_blocked_slots_updated_at ON public.blocked_slots;
+CREATE TRIGGER trg_blocked_slots_updated_at
+  BEFORE UPDATE ON public.blocked_slots
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS trg_licenses_updated_at ON public.licenses;
+CREATE TRIGGER trg_licenses_updated_at
+  BEFORE UPDATE ON public.licenses
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at_column();
 
 -- 7. Row Level Security (RLS estricto: cero escritura o lectura de PII para anon)
 ALTER TABLE public.business_settings ENABLE ROW LEVEL SECURITY;
@@ -152,75 +259,66 @@ ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.blocked_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.licenses ENABLE ROW LEVEL SECURITY;
 
--- Eliminar cualquier política anon heredada o insegura
-DROP POLICY IF EXISTS "clients_select_anon" ON public.clients;
-DROP POLICY IF EXISTS "clients_insert_anon" ON public.clients;
-DROP POLICY IF EXISTS "clients_update_anon" ON public.clients;
-DROP POLICY IF EXISTS "appointments_select_anon" ON public.appointments;
-DROP POLICY IF EXISTS "appointments_insert_anon" ON public.appointments;
-DROP POLICY IF EXISTS "appointments_update_anon" ON public.appointments;
-DROP POLICY IF EXISTS "appointments_update_cancel_anon" ON public.appointments;
-DROP POLICY IF EXISTS "blocked_slots_insert_anon" ON public.blocked_slots;
-DROP POLICY IF EXISTS "blocked_slots_delete_anon" ON public.blocked_slots;
-DROP POLICY IF EXISTS "blocked_slots_select_all" ON public.blocked_slots;
-DROP POLICY IF EXISTS "licenses_select_anon" ON public.licenses;
-DROP POLICY IF EXISTS "licenses_insert_anon" ON public.licenses;
-DROP POLICY IF EXISTS "licenses_update_anon" ON public.licenses;
+-- La app lee y escribe datos privados solo desde el servidor con service_role (omite RLS).
+-- El público únicamente lee servicios activos y usa las RPCs de la sección 8.
+DROP POLICY IF EXISTS "settings_all_policy" ON public.business_settings;
+DROP POLICY IF EXISTS "settings_select_authenticated" ON public.business_settings;
+DROP POLICY IF EXISTS "settings_insert_authenticated" ON public.business_settings;
+DROP POLICY IF EXISTS "settings_update_authenticated" ON public.business_settings;
+DROP POLICY IF EXISTS "settings_delete_authenticated" ON public.business_settings;
 DROP POLICY IF EXISTS "settings_insert_anon" ON public.business_settings;
 DROP POLICY IF EXISTS "settings_update_anon" ON public.business_settings;
 DROP POLICY IF EXISTS "settings_select_all" ON public.business_settings;
+DROP POLICY IF EXISTS "services_all_policy" ON public.services;
+DROP POLICY IF EXISTS "services_select_authenticated" ON public.services;
+DROP POLICY IF EXISTS "services_insert_authenticated" ON public.services;
+DROP POLICY IF EXISTS "services_update_authenticated" ON public.services;
+DROP POLICY IF EXISTS "services_delete_authenticated" ON public.services;
 DROP POLICY IF EXISTS "services_select_all_anon" ON public.services;
 DROP POLICY IF EXISTS "services_insert_anon" ON public.services;
 DROP POLICY IF EXISTS "services_update_anon" ON public.services;
 DROP POLICY IF EXISTS "services_delete_anon" ON public.services;
+DROP POLICY IF EXISTS "clients_select_authenticated" ON public.clients;
+DROP POLICY IF EXISTS "clients_insert_authenticated" ON public.clients;
+DROP POLICY IF EXISTS "clients_update_authenticated" ON public.clients;
+DROP POLICY IF EXISTS "clients_delete_authenticated" ON public.clients;
+DROP POLICY IF EXISTS "clients_select_anon" ON public.clients;
+DROP POLICY IF EXISTS "clients_insert_anon" ON public.clients;
+DROP POLICY IF EXISTS "clients_update_anon" ON public.clients;
+DROP POLICY IF EXISTS "appointments_select_authenticated" ON public.appointments;
+DROP POLICY IF EXISTS "appointments_insert_authenticated" ON public.appointments;
+DROP POLICY IF EXISTS "appointments_update_authenticated" ON public.appointments;
+DROP POLICY IF EXISTS "appointments_delete_authenticated" ON public.appointments;
+DROP POLICY IF EXISTS "appointments_select_anon" ON public.appointments;
+DROP POLICY IF EXISTS "appointments_insert_anon" ON public.appointments;
+DROP POLICY IF EXISTS "appointments_update_anon" ON public.appointments;
+DROP POLICY IF EXISTS "appointments_update_cancel_anon" ON public.appointments;
+DROP POLICY IF EXISTS "blocked_slots_select_authenticated" ON public.blocked_slots;
+DROP POLICY IF EXISTS "blocked_slots_insert_authenticated" ON public.blocked_slots;
+DROP POLICY IF EXISTS "blocked_slots_update_authenticated" ON public.blocked_slots;
+DROP POLICY IF EXISTS "blocked_slots_delete_authenticated" ON public.blocked_slots;
+DROP POLICY IF EXISTS "blocked_slots_insert_anon" ON public.blocked_slots;
+DROP POLICY IF EXISTS "blocked_slots_delete_anon" ON public.blocked_slots;
+DROP POLICY IF EXISTS "blocked_slots_select_all" ON public.blocked_slots;
+DROP POLICY IF EXISTS "licenses_select_authenticated" ON public.licenses;
+DROP POLICY IF EXISTS "licenses_insert_authenticated" ON public.licenses;
+DROP POLICY IF EXISTS "licenses_update_authenticated" ON public.licenses;
+DROP POLICY IF EXISTS "licenses_delete_authenticated" ON public.licenses;
+DROP POLICY IF EXISTS "licenses_select_anon" ON public.licenses;
+DROP POLICY IF EXISTS "licenses_insert_anon" ON public.licenses;
+DROP POLICY IF EXISTS "licenses_update_anon" ON public.licenses;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_settings' AND policyname = 'settings_all_policy') THEN
-    CREATE POLICY "settings_all_policy" ON public.business_settings FOR ALL TO public USING (true) WITH CHECK (true);
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_all_policy') THEN
-    CREATE POLICY "services_all_policy" ON public.services FOR ALL TO public USING (true) WITH CHECK (true);
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'clients' AND policyname = 'clients_select_authenticated') THEN
-    CREATE POLICY "clients_select_authenticated" ON public.clients FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'clients' AND policyname = 'clients_insert_authenticated') THEN
-    CREATE POLICY "clients_insert_authenticated" ON public.clients FOR INSERT TO authenticated WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'clients' AND policyname = 'clients_update_authenticated') THEN
-    CREATE POLICY "clients_update_authenticated" ON public.clients FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'appointments' AND policyname = 'appointments_select_authenticated') THEN
-    CREATE POLICY "appointments_select_authenticated" ON public.appointments FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'appointments' AND policyname = 'appointments_insert_authenticated') THEN
-    CREATE POLICY "appointments_insert_authenticated" ON public.appointments FOR INSERT TO authenticated WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'appointments' AND policyname = 'appointments_update_authenticated') THEN
-    CREATE POLICY "appointments_update_authenticated" ON public.appointments FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'blocked_slots' AND policyname = 'blocked_slots_select_authenticated') THEN
-    CREATE POLICY "blocked_slots_select_authenticated" ON public.blocked_slots FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'blocked_slots' AND policyname = 'blocked_slots_insert_authenticated') THEN
-    CREATE POLICY "blocked_slots_insert_authenticated" ON public.blocked_slots FOR INSERT TO authenticated WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'blocked_slots' AND policyname = 'blocked_slots_delete_authenticated') THEN
-    CREATE POLICY "blocked_slots_delete_authenticated" ON public.blocked_slots FOR DELETE TO authenticated USING (true);
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'licenses' AND policyname = 'licenses_select_authenticated') THEN
-    CREATE POLICY "licenses_select_authenticated" ON public.licenses FOR SELECT TO authenticated USING (true);
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'services' AND policyname = 'services_select_anon') THEN
+    CREATE POLICY "services_select_anon" ON public.services FOR SELECT TO anon USING (activo = true);
   END IF;
 END
 $$;
 
 -- 8. RPCs SECURITY DEFINER seguras para el frontend público sin exponer PII
+
+DROP FUNCTION IF EXISTS public.get_public_business_settings();
 
 CREATE OR REPLACE FUNCTION public.get_public_business_settings()
 RETURNS TABLE (
@@ -235,7 +333,8 @@ RETURNS TABLE (
   modo_demo BOOLEAN,
   direccion TEXT,
   telefono_contacto TEXT,
-  timezone TEXT
+  timezone TEXT,
+  campos_formulario JSONB
 )
 LANGUAGE sql
 STABLE
@@ -254,7 +353,8 @@ AS $$
     bs.modo_demo,
     bs.direccion,
     bs.telefono_contacto,
-    COALESCE(NULLIF(bs.timezone, ''), 'Europe/Madrid') AS timezone
+    COALESCE(NULLIF(bs.timezone, ''), 'Europe/Madrid') AS timezone,
+    COALESCE(bs.campos_formulario, '{"nombre":{"activo":true,"requerido":true},"email":{"activo":true,"requerido":true},"telefono":{"activo":true,"requerido":true},"notas":{"activo":true,"requerido":false}}'::jsonb) AS campos_formulario
   FROM public.business_settings bs
   ORDER BY bs.created_at ASC
   LIMIT 1;
@@ -358,50 +458,6 @@ $$;
 
 REVOKE ALL ON FUNCTION public.get_appointment_by_cancel_token(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_appointment_by_cancel_token(UUID) TO anon, authenticated, service_role;
-
-CREATE OR REPLACE FUNCTION public.cancel_appointment_by_token(p_token UUID)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_id UUID;
-  v_estado TEXT;
-BEGIN
-  IF p_token IS NULL THEN
-    RETURN jsonb_build_object('cancelled', false, 'reason', 'invalid_token');
-  END IF;
-
-  SELECT a.id, a.estado
-  INTO v_id, v_estado
-  FROM public.appointments a
-  WHERE a.token_cancelacion = p_token
-  FOR UPDATE;
-
-  IF v_id IS NULL THEN
-    RETURN jsonb_build_object('cancelled', false, 'reason', 'not_found');
-  END IF;
-
-  IF v_estado = 'cancelada' THEN
-    RETURN jsonb_build_object('cancelled', false, 'reason', 'already_cancelled', 'id', v_id, 'estado', v_estado);
-  END IF;
-
-  IF v_estado = 'completada' THEN
-    RETURN jsonb_build_object('cancelled', false, 'reason', 'already_completed', 'id', v_id, 'estado', v_estado);
-  END IF;
-
-  UPDATE public.appointments
-  SET estado = 'cancelada'
-  WHERE id = v_id
-    AND estado = 'confirmada';
-
-  RETURN jsonb_build_object('cancelled', true, 'id', v_id, 'estado', 'cancelada');
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.cancel_appointment_by_token(UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.cancel_appointment_by_token(UUID) TO anon, authenticated, service_role;
 
 -- ============================================================================
 -- Rate limiting persistente + contadores atómicos de clientes
@@ -573,15 +629,169 @@ $$;
 REVOKE ALL ON FUNCTION public.cancel_appointment_by_token(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.cancel_appointment_by_token(UUID) TO anon, authenticated, service_role;
 
+-- Restauración de datos demo (solo service_role)
+CREATE OR REPLACE FUNCTION public.reset_demo_data(force BOOLEAN DEFAULT false)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_settings RECORD;
+    v_minutos_transcurridos NUMERIC;
+    v_service1_id UUID := gen_random_uuid();
+    v_service2_id UUID := gen_random_uuid();
+    v_service3_id UUID := gen_random_uuid();
+    v_service4_id UUID := gen_random_uuid();
+    v_client1_id UUID := gen_random_uuid();
+    v_client2_id UUID := gen_random_uuid();
+    v_client3_id UUID := gen_random_uuid();
+    v_client4_id UUID := gen_random_uuid();
+BEGIN
+    -- Si el invocador es anon, ignorar cualquier intento de forzar bypass del cooldown
+    IF COALESCE(auth.role(), 'anon') = 'anon' THEN
+        force := false;
+    END IF;
+
+    -- Obtener la configuración de negocio existente
+    SELECT * INTO v_settings FROM public.business_settings LIMIT 1;
+
+    -- Si no existe ninguna configuración, crear la inicial por defecto
+    IF v_settings IS NULL THEN
+        INSERT INTO public.business_settings (
+            nombre_negocio,
+            logo_url,
+            tema_activo,
+            horario_apertura,
+            horario_cierre,
+            dias_laborables,
+            duracion_cita_minutos,
+            email_notificaciones,
+            modo_demo,
+            ultima_restauracion_demo
+        ) VALUES (
+            'Krono / Donaire Luxury Hair & Styling',
+            'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=128&q=80',
+            'dark_luxury',
+            '09:00:00',
+            '20:00:00',
+            '["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]'::jsonb,
+            45,
+            'reservas@donairecitas.pro',
+            true,
+            NOW()
+        ) RETURNING * INTO v_settings;
+    END IF;
+
+    -- Validar si el modo demo está activado
+    IF NOT v_settings.modo_demo THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'code', 'DEMO_MODE_DISABLED',
+            'message', 'El modo demo está desactivado en la configuración del negocio.'
+        );
+    END IF;
+
+    -- Calcular minutos desde la última restauración
+    IF v_settings.ultima_restauracion_demo IS NOT NULL THEN
+        v_minutos_transcurridos := EXTRACT(EPOCH FROM (NOW() - v_settings.ultima_restauracion_demo)) / 60.0;
+    ELSE
+        v_minutos_transcurridos := 9999;
+    END IF;
+
+    -- Comprobar si han pasado al menos 60 minutos (a menos que se fuerce por admin autenticado)
+    IF NOT force AND v_minutos_transcurridos < 60 THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'code', 'COOLDOWN_ACTIVE',
+            'message', 'Deben transcurrir al menos 60 minutos entre restauraciones de la demo.',
+            'minutos_transcurridos', ROUND(v_minutos_transcurridos, 1),
+            'minutos_restantes', ROUND(60 - v_minutos_transcurridos, 1)
+        );
+    END IF;
+
+    -- ==========================================================
+    -- RESTAURACIÓN Y RE-SEMILLADO DE DATOS DEMO
+    -- ==========================================================
+    DELETE FROM public.appointments;
+    DELETE FROM public.blocked_slots;
+    DELETE FROM public.services;
+    DELETE FROM public.clients;
+
+    -- Actualizar configuración a valores estándar
+    UPDATE public.business_settings
+    SET 
+        nombre_negocio = 'Krono / Donaire Luxury Hair & Styling',
+        logo_url = 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=128&q=80',
+        tema_activo = 'dark_luxury',
+        horario_apertura = '09:00:00',
+        horario_cierre = '20:00:00',
+        dias_laborables = '["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]'::jsonb,
+        duracion_cita_minutos = 45,
+        email_notificaciones = 'reservas@donairecitas.pro',
+        modo_demo = true,
+        ultima_restauracion_demo = NOW(),
+        updated_at = NOW()
+    WHERE id = v_settings.id;
+
+    -- Sembrar servicios premium
+    INSERT INTO public.services (id, nombre, descripcion, precio, duracion_minutos, activo)
+    VALUES
+        (v_service1_id, 'Corte Signature & Styling VIP', 'Corte personalizado con tijera y navaja japonesa, lavado con champú orgánico y acabado con fijador premium.', 35.00, 45, true),
+        (v_service2_id, 'Ritual Barba & Toalla Caliente', 'Perfilado al milímetro con navaja clásica, exfoliación previa, toalla aromaterapéutica caliente y aceite nutritivo.', 25.00, 30, true),
+        (v_service3_id, 'Pack Total Donaire (Corte + Barba VIP)', 'Experiencia completa que incluye Corte Signature, Ritual Barba completo y mascarilla capilar purificante.', 55.00, 75, true),
+        (v_service4_id, 'Tratamiento Detox & Masaje Craneal', 'Tratamiento desintoxicante del cuero cabelludo con masaje shiatsu relajante de 20 minutos.', 40.00, 45, true);
+
+    -- Sembrar clientes
+    INSERT INTO public.clients (id, nombre, email, telefono, ultima_visita, total_citas, notas, bloqueado_no_show)
+    VALUES
+        (v_client1_id, 'Carlos Mendoza', 'carlos.mendoza@example.com', '+34 612 345 678', NOW() - INTERVAL '7 days', 8, 'Cliente VIP. Prefiere café espresso sin azúcar y corte con degradado medio.', false),
+        (v_client2_id, 'Alejandro Rivera', 'alejandro.rivera@example.com', '+34 623 456 789', NOW() - INTERVAL '15 days', 4, 'Siempre solicita perfilado suave de barba sin rebajar mucho el largo.', false),
+        (v_client3_id, 'Sofía Navarro', 'sofia.navarro@example.com', '+34 634 567 890', NOW() - INTERVAL '2 days', 2, 'Piel sensible en cuello, aplicar bálsamo calmante hipoalergénico.', false),
+        (v_client4_id, 'Cliente No-Show Demo', 'noshow@example.com', '+34 699 999 999', NOW() - INTERVAL '30 days', 1, 'No asistió a sus 2 últimas citas sin previo aviso. Marcado como no-show.', true);
+
+    -- Sembrar citas
+    INSERT INTO public.appointments (client_id, service_id, fecha_hora_inicio, fecha_hora_fin, estado, token_cancelacion)
+    VALUES
+        (v_client1_id, v_service1_id, CURRENT_DATE + TIME '10:00:00', CURRENT_DATE + TIME '10:45:00', 'completada', gen_random_uuid()),
+        (v_client2_id, v_service2_id, CURRENT_DATE + TIME '12:30:00', CURRENT_DATE + TIME '13:00:00', 'confirmada', gen_random_uuid()),
+        (v_client3_id, v_service3_id, (CURRENT_DATE + INTERVAL '1 day') + TIME '16:00:00', (CURRENT_DATE + INTERVAL '1 day') + TIME '17:15:00', 'confirmada', gen_random_uuid());
+
+    -- Sembrar bloqueos
+    INSERT INTO public.blocked_slots (fecha_inicio, fecha_fin, motivo)
+    VALUES
+        (CURRENT_DATE + TIME '14:00:00', CURRENT_DATE + TIME '15:00:00', 'Pausa técnica y almuerzo del equipo'),
+        ((CURRENT_DATE + INTERVAL '1 day') + TIME '14:00:00', (CURRENT_DATE + INTERVAL '1 day') + TIME '15:00:00', 'Pausa técnica y almuerzo del equipo');
+
+    -- Sembrar licencia
+    INSERT INTO public.licenses (license_key, comprador_email, stripe_session_id, plan, activa, dominio_autorizado)
+    VALUES ('DONAIRE-DEMO-2027', 'demo@donairecitas.pro', 'cs_test_demo_session_krono', 'llave_en_mano_99', true, 'localhost')
+    ON CONFLICT (license_key) DO UPDATE
+    SET activa = true, dominio_autorizado = 'localhost';
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'code', 'RESET_SUCCESSFUL',
+        'message', 'Los datos iniciales de prueba de la demo han sido restaurados con éxito.',
+        'timestamp', NOW()
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.reset_demo_data(BOOLEAN) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reset_demo_data(BOOLEAN) TO service_role;
+
 -- 9. Permisos globales de Supabase (esquema, tablas, secuencias y recarga de caché)
 GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+-- Sin EXECUTE global para anon/authenticated: reabriría las funciones privadas.
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, service_role;
+REVOKE ALL ON TABLE public.rate_limits FROM PUBLIC, anon, authenticated;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO postgres, service_role;
 
 NOTIFY pgrst, 'reload schema';
 `;

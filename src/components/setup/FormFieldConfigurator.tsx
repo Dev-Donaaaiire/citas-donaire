@@ -15,7 +15,6 @@ import {
 import {
   FORM_FIELD_RULES,
   type FormCustomizationSettings,
-  type FieldRuleDefinition,
 } from '@/lib/form-field-rules'
 
 interface FormFieldConfiguratorProps {

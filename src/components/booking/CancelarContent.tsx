@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useLayoutEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   Calendar,
@@ -35,6 +36,7 @@ export function CancelarContent({
   temaActivo,
 }: CancelarContentProps) {
   useBusinessTheme(temaActivo, true)
+  const router = useRouter()
 
   const [appointment, setAppointment] =
     useState<CancelAppointmentDetails | null>(initialAppointment)
@@ -45,13 +47,28 @@ export function CancelarContent({
   )
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
-  useEffect(() => {
+  // Resincroniza el estado cuando llegan datos nuevos del servidor
+  // (ajuste durante el render; un cambio de token remonta vía `key`).
+  const [syncedProps, setSyncedProps] = useState<{
+    initialAppointment: CancelAppointmentDetails | null
+    initialError: string | null
+  } | null>({ initialAppointment, initialError })
+
+  if (
+    syncedProps?.initialAppointment !== initialAppointment ||
+    syncedProps.initialError !== initialError
+  ) {
+    setSyncedProps({ initialAppointment, initialError })
     setAppointment(initialAppointment)
     setErrorMsg(initialError)
     setCancelledSuccess(initialAppointment?.estado === 'cancelada')
     setIsCancelling(false)
     setShowCancelConfirm(false)
-  }, [token, initialAppointment, initialError])
+  }
+
+  // Con cacheComponents la ruta se oculta (Activity) en vez de desmontarse:
+  // al salir se invalida la copia para resincronizar al volver.
+  useLayoutEffect(() => () => setSyncedProps(null), [])
 
   const handleConfirmCancel = async () => {
     if (!appointment || !token) return
@@ -62,6 +79,8 @@ export function CancelarContent({
       await confirmCancelAppointment(token)
       setCancelledSuccess(true)
       setAppointment((prev) => (prev ? { ...prev, estado: 'cancelada' } : prev))
+      // Actualiza los datos del servidor para que "atrás" no muestre la cita activa
+      router.refresh()
     } catch (err) {
       setErrorMsg(
         err instanceof Error

@@ -422,18 +422,26 @@ export async function issueOrGetLicenseForPaymentSession(params: {
     )
   }
 
-  if (params.paymentSessionId) {
-    const { data: existing } = await masterClient
+  const findBySession = async () => {
+    if (!params.paymentSessionId) return null
+    const { data, error } = await masterClient
       .from('licenses')
       .select('*')
       .eq('stripe_session_id', params.paymentSessionId)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
-    if (existing) {
-      return {
-        license: existing,
-        alreadyExisted: true,
-      }
+    // Ante un fallo de lectura no emitimos: podría duplicar la licencia
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  const existing = await findBySession()
+  if (existing) {
+    return {
+      license: existing,
+      alreadyExisted: true,
     }
   }
 
@@ -459,6 +467,14 @@ export async function issueOrGetLicenseForPaymentSession(params: {
       }
     }
     lastError = error?.message || 'Error al insertar licencia'
+
+    // Otra entrega simultánea del mismo pago pudo insertarla antes
+    if (error?.code === '23505') {
+      const concurrent = await findBySession()
+      if (concurrent) {
+        return { license: concurrent, alreadyExisted: true }
+      }
+    }
   }
 
   throw new Error(lastError || 'No se pudo generar la clave de licencia.')

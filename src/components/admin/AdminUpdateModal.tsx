@@ -5,7 +5,6 @@ import {
   X,
   Sparkles,
   ExternalLink,
-  GitBranch,
   Copy,
   Check,
   RefreshCw,
@@ -46,7 +45,7 @@ jobs:
           git config user.email "\${{ github.actor_id }}+\${{ github.actor }}@users.noreply.github.com"
           git remote add upstream https://github.com/Dev-Donaaaiire/citas-donaire.git || git remote set-url upstream https://github.com/Dev-Donaaaiire/citas-donaire.git
           git fetch upstream main
-          git checkout upstream/main -- src public package.json package-lock.json next.config.ts tsconfig.json README.md
+          git checkout upstream/main -- src public package.json package-lock.json next.config.ts tsconfig.json README.md supabase/migrations
           git add -A
           if git diff --staged --quiet; then
             echo "Sin cambios nuevos: el repositorio ya está en la última versión."

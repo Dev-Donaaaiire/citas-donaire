@@ -25,8 +25,9 @@ Plataforma Next.js 16 (App Router, `proxy.ts`, Server Components, React 19, Tail
    - `ADMIN_PASSWORD` (mínimo 10 caracteres) y `ADMIN_SESSION_SECRET` (mínimo 16 caracteres, obligatorio en producción)
    - `RESEND_API_KEY` y `RESEND_FROM_EMAIL` (verifica tu dominio en Resend para envíos a clientes externos)
    - `LICENSE_KEY` (desbloquea producción cuando `modo_demo = false`)
+   - `ALLOW_PUBLIC_DEMO_DB` (opcional; solo con `true` y `modo_demo` activo las rutas `/demo` usan la base de datos real; por defecto, sandbox)
 3. **Aplicar migraciones SQL en Supabase**:
-   Ejecuta las migraciones de `supabase/migrations/` en orden (incluyendo `20261115000000_security_hardening_rls_constraints_rpc.sql` y `20261115010000_rate_limit_and_atomic_counters.sql`) o utiliza el bloque SQL completo sincronizado disponible dentro de `/setup` o en `src/lib/initial-sql.ts`.
+   Ejecuta las migraciones de `supabase/migrations/` en orden (incluyendo `20261115000000_security_hardening_rls_constraints_rpc.sql`, `20261115010000_rate_limit_and_atomic_counters.sql` y `20261127000000_tighten_rls_policies.sql`) o utiliza el bloque SQL completo sincronizado disponible dentro de `/setup` o en `src/lib/initial-sql.ts`. En instalaciones existentes, aplica a mano las migraciones nuevas tras cada actualización.
 4. **Verificar en local**:
    ```bash
    npm run dev
