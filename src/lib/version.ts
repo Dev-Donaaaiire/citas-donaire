@@ -3,6 +3,8 @@ export const CURRENT_SYSTEM_VERSION =
   process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0'
 export const RELEASE_DATE = '2026-11-28'
 export const RELEASE_NOTES = [
+  '📣 Huecos para Stories, WhatsApp en un toque, reseñas y «Te toca volver».',
+  '⏰ Recordatorio el día antes con confirmación y lista de espera.',
   '⚙️ La base de datos se actualiza sola en cada despliegue.',
   '🔄 Actualizaciones semanales automáticas a versiones publicadas.',
   '🚀 Instalación con Supabase incluido desde el botón de Vercel.',

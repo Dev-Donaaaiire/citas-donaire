@@ -223,6 +223,7 @@ export const LEGAL_DOCS: LegalDoc[] = [
         heading: '6. Datos de los clientes finales del Comprador',
         paragraphs: [
           'Cuando el Comprador instala el Software en su propia infraestructura, él es el responsable del tratamiento de los datos de sus clientes (nombre, email, teléfono, citas) y debe informarles y contar con base legal. El Proveedor no accede a esas bases de datos, salvo en el plan «Llave en Mano» durante la configuración, actuando entonces como encargado del tratamiento por cuenta del Comprador.',
+          'El Software incluye una lista de espera (guarda nombre, correo, servicio y fecha deseada para avisar si queda un hueco, y se borra una vez pasada la fecha) y un recordatorio por correo el día anterior a cada cita. El Comprador debe mencionarlo en su propia información de privacidad.',
         ],
       },
       {
