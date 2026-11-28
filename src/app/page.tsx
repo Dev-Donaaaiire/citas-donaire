@@ -1,3 +1,4 @@
+import { showSalesLanding } from '@/lib/sales-landing'
 import React, { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { connection } from 'next/server'
@@ -6,13 +7,6 @@ import { Loader2 } from 'lucide-react'
 import { LandingPage } from '@/components/landing/LandingPage'
 import { ReservarContent } from '@/components/booking/ReservarContent'
 import { getPublicBookingInitialData } from '@/lib/data/public-booking'
-
-const showSalesLanding =
-  process.env.NEXT_PUBLIC_SHOW_SALES_LANDING?.trim().toLowerCase() === 'true' ||
-  (process.env.NEXT_PUBLIC_APP_URL || '').toLowerCase().includes('donaire.dev') ||
-  (process.env.NEXT_PUBLIC_APP_URL || '').toLowerCase().includes('citas-donaire') ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL || '').toLowerCase().includes('donaire.dev') ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL || '').toLowerCase().includes('citas-donaire')
 
 export async function generateMetadata(): Promise<Metadata> {
   if (showSalesLanding) {
