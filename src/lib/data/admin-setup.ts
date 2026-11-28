@@ -3,11 +3,6 @@ import 'server-only'
 
 import { isAdminAuthConfigured } from '@/lib/admin-session-token'
 import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
-import {
-  resolveTrustedDeploymentDomain,
-  verifyLicenseServer,
-  type LicenseVerificationResult,
-} from '@/lib/license'
 import { normalizeFormFields } from '@/lib/form-field-rules'
 import type { BusinessSettings, Service } from '@/types/booking'
 
@@ -16,12 +11,10 @@ export interface SetupDiagnosticsData {
   hasSupabaseAnonKey: boolean
   hasServiceRole: boolean
   hasResendKey: boolean
-  hasLicenseKey: boolean
   hasAdminSecret: boolean
   schemaReady: boolean
   missingTables: string[]
   dbErrorDetail?: string | null
-  license: LicenseVerificationResult
 }
 
 export interface InitialSetupPayload {
@@ -39,7 +32,6 @@ export async function getAdminSetupData(): Promise<InitialSetupPayload> {
   const hasResendKey = Boolean(
     process.env.RESEND_API_KEY?.trim()?.startsWith('re_')
   )
-  const hasLicenseKey = Boolean(process.env.LICENSE_KEY?.trim())
   const hasAdminSecret = isAdminAuthConfigured()
 
   let schemaReady = false
@@ -96,23 +88,16 @@ export async function getAdminSetupData(): Promise<InitialSetupPayload> {
     }
   }
 
-  const license = await verifyLicenseServer({
-    domain: resolveTrustedDeploymentDomain(),
-    allowDomainBind: Boolean(resolveTrustedDeploymentDomain()),
-  })
-
   return {
     diagnostics: {
       hasSupabaseUrl,
       hasSupabaseAnonKey,
       hasServiceRole,
       hasResendKey,
-      hasLicenseKey,
       hasAdminSecret,
       schemaReady,
       missingTables,
       dbErrorDetail: dbErrorDetail || null,
-      license,
     },
     settings,
     services,

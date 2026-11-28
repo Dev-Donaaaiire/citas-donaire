@@ -2,7 +2,6 @@ import 'server-only'
 import crypto from 'node:crypto'
 
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
-import { checkProductionLicenseGate } from '@/lib/license'
 import { sendBookingConfirmationEmails } from '@/lib/email-service'
 import { normalizeFormFields } from '@/lib/form-field-rules'
 import {
@@ -207,20 +206,6 @@ export async function createServerBooking(
       )
     }
     effectivePhone = rawPhone
-  }
-
-  // Verificar licencia del sistema: previene bypass con modo_demo en producción en dominios reales
-  const isRealBookingInProduction = !input.isDemoRequest
-  const licenseGate = await checkProductionLicenseGate(
-    Boolean(settingsRow.modo_demo),
-    { isRealBookingInProduction }
-  )
-  if (licenseGate.blocked) {
-    throw new BookingApiError(
-      'Las reservas online están pausadas temporalmente por estado de licencia.',
-      403,
-      'LICENSE_REQUIRED'
-    )
   }
 
   // 2. Validar servicio existente y activo

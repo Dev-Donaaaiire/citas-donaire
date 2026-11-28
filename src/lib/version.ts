@@ -3,6 +3,7 @@ export const CURRENT_SYSTEM_VERSION =
   process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0'
 export const RELEASE_DATE = '2026-11-28'
 export const RELEASE_NOTES = [
+  '🎁 Krono pasa a ser gratuito: sin licencias, precios ni pagos.',
   '📣 Huecos para Stories, WhatsApp en un toque, reseñas y «Te toca volver».',
   '⏰ Recordatorio el día antes con confirmación y lista de espera.',
   '⚙️ La base de datos se actualiza sola en cada despliegue.',

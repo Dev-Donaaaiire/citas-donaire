@@ -1,8 +1,7 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import Link from 'next/link'
-import { Calendar, Users, RefreshCw, ShieldAlert } from 'lucide-react'
+import { Calendar, Users, RefreshCw } from 'lucide-react'
 import type { AdminDashboardPayload } from '@/lib/data/admin-dashboard'
 import { fetchAdminDashboardClient } from '@/lib/booking-service'
 import { sanitizeTimeZone } from '@/lib/timezone'
@@ -95,7 +94,6 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
     <div className="min-h-dvh bg-zinc-950 text-zinc-100 flex flex-col">
       <AdminHeader
         settings={data.settings}
-        license={data.license}
         isSandboxFallback={data.isSandboxFallback}
         onDemoReset={() => void refreshDashboard()}
       />
@@ -112,31 +110,6 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
               ). Estás interactuando con datos ficticios aislados sin acceso ni
               escritura sobre clientes reales.
             </span>
-          </div>
-        )}
-
-        {data.licenseBlocked && !isDemoRoute && (
-          <div
-            role="alert"
-            className="p-4 rounded-2xl bg-amber-950/35 border border-amber-500/35 text-xs sm:text-sm text-amber-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-          >
-            <div className="flex items-start gap-2.5">
-              <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-amber-200">
-                  Licencia comercial requerida para aceptar reservas públicas
-                </p>
-                <p className="text-xs text-amber-200/80 mt-0.5">
-                  {data.license.message}
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/setup"
-              className="min-h-12 px-4 rounded-xl bg-amber-400 text-zinc-950 font-semibold text-xs flex items-center justify-center shrink-0 hover:bg-amber-300 transition-colors"
-            >
-              Activar en /setup
-            </Link>
           </div>
         )}
 

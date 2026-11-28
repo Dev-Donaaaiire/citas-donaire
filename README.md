@@ -1,23 +1,34 @@
-# Krono / Donaire Citas · Sistema de Reservas Profesional para Negocios
+# Krono · Reservas online gratis para negocios con cita previa
 
-Plataforma Next.js 16 (App Router, `proxy.ts`, Server Components, React 19, Tailwind v4) y Supabase con RLS estricto, prevención física de reservas duplicadas mediante índice `btree_gist`, notificaciones por email con archivo `.ics`, autenticación HMAC administrativa y multi-tema adaptativo (`dark_luxury`, `clean_minimal`, `neon_creator`).
+Hecho por **Álvaro, 15 años**. Si te gusta, deja una ⭐ en este repositorio: es la forma de apoyar el proyecto.
+
+Barberías, clínicas, centros de estética, tatuadores o coaches: los clientes reservan desde un enlace y el dueño gestiona la agenda en su panel.
+
+**Qué resuelve**
+
+- Citas sin llamadas ni mensajes sueltos, con confirmación y archivo de calendario.
+- Dos personas no pueden reservar la misma hora: lo impide la base de datos.
+- Señala a los clientes que no han vuelto y frena a quien acumula plantones.
+- Tres diseños y demo pública en `/demo` y `/demo/admin`.
+
+**Con qué está hecho:** Next.js 16 (App Router, Server Components), React 19, TypeScript, Tailwind v4, Supabase con RLS e índice `btree_gist`, Resend y sesiones firmadas con HMAC.
 
 ---
 
 ## Instalación (Vercel + Supabase)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDev-Donaaaiire%2Fcitas-donaire%2Ftree%2Fmain&env=ADMIN_PASSWORD,LICENSE_KEY&envDescription=Contrase%C3%B1a%20del%20panel%20(m%C3%ADn.%2010)%20y%20clave%20de%20licencia&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22supabase%22%2C%22productSlug%22%3A%22supabase%22%2C%22protocol%22%3A%22storage%22%7D%5D&project-name=agenda-citas&repository-name=agenda-citas)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDev-Donaaaiire%2Fcitas-donaire%2Ftree%2Fmain&env=ADMIN_PASSWORD&envDescription=Contrase%C3%B1a%20para%20tu%20panel%20(m%C3%ADnimo%2010%20caracteres)&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22supabase%22%2C%22productSlug%22%3A%22supabase%22%2C%22protocol%22%3A%22storage%22%7D%5D&project-name=agenda-citas&repository-name=agenda-citas)
 
 1. Pulsa el botón y entra con GitHub.
 2. Acepta crear la base de datos Supabase: las claves se rellenan solas.
-3. Escribe `ADMIN_PASSWORD` (mínimo 10 caracteres) y `LICENSE_KEY`.
+3. Escribe `ADMIN_PASSWORD` (mínimo 10 caracteres).
 4. Al terminar, entra en `/setup` y configura tu negocio.
 
 La base de datos se crea y actualiza sola durante la compilación. Para enviar emails añade después `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (dominio verificado) y `OWNER_NOTIFICATION_EMAIL`.
 
-> El plan Hobby de Vercel no permite uso comercial: un negocio necesita un plan que lo permita.
+> Krono es gratis, pero cada servicio tiene sus condiciones: el plan Hobby de Vercel no permite uso comercial, así que un negocio necesita un plan que lo permita u otro alojamiento.
 
-### Certificado de la base de datos (una sola vez, el autor)
+### Certificado de la base de datos (una sola vez, quien publica versiones)
 Las migraciones validan siempre el certificado del servidor. Descarga el certificado raíz en Supabase → Project Settings → Database → SSL Configuration y guárdalo como `src/db/supabase-ca.crt` antes de publicar la versión. Es público y viaja con las actualizaciones. Alternativa por instalación: variable `SUPABASE_DB_CA` con su contenido.
 
 ### Instalación manual
@@ -27,7 +38,7 @@ Copia `.env.example` a `.env.local`, rellena las variables y define `SUPABASE_DB
 
 Cada lunes, el workflow `krono-sync.yml` trae la última versión publicada, ejecuta los tests, compila y solo entonces la sube; Vercel la despliega y aplica los cambios de base de datos. También puede lanzarse a mano (Actions → Run workflow).
 
-- Si una actualización falla, se abre un aviso (Issue) en el repositorio del cliente y el panel lo señala pasados 9 días.
+- Si una actualización falla, se abre un aviso (Issue) en tu repositorio y el panel lo señala pasados 9 días.
 - Para desactivar la automática: Settings → Secrets and variables → Actions → Variables → `KRONO_AUTO_UPDATE=false`.
 - Se sobrescriben `src`, `supabase`, `scripts`, `tests` y la configuración del proyecto: no los edites si quieres recibir actualizaciones.
 - Instalaciones anteriores a la 1.5.0: sustituye una vez `.github/workflows/krono-sync.yml` por el que muestra el panel.
@@ -52,28 +63,18 @@ Cada lunes, el workflow `krono-sync.yml` trae la última versión publicada, eje
 
 El recordatorio lo lanza el cron de Vercel a las 16:00 UTC. En otro alojamiento hay que llamar una vez al día a `/api/cron/reminders`. Si se define `CRON_SECRET`, la llamada debe enviar `Authorization: Bearer <valor>` (Vercel lo hace solo).
 
-## Flujo recomendado para compradores
+## Primeros pasos
 
 1. Accede a `/setup` tras iniciar sesión en `/admin/login`.
-2. Revisa el diagnóstico de entorno (`Service Role`, tablas SQL, RLS y licencia).
+2. Revisa el diagnóstico de entorno (`Service Role`, tablas SQL y RLS).
 3. Configura nombre del negocio, dirección, teléfono, zona horaria (por defecto `Europe/Madrid`), horario, tema visual y catálogo de servicios.
 4. Comparte `/reservar` en tu biografía de Instagram, WhatsApp o Google Maps.
 
 ## Notas operativas de Seguridad
 
-- El tráfico anónimo público nunca accede directamente a tablas con datos personales (`clients`, `appointments`, `licenses`): utiliza funciones PostgreSQL `SECURITY DEFINER` mínimas (`get_public_busy_intervals`, `get_appointment_by_cancel_token`, `cancel_appointment_by_token`) y el endpoint `POST /api/bookings`.
+- El tráfico anónimo público nunca accede directamente a tablas con datos personales (`clients`, `appointments`): utiliza funciones PostgreSQL `SECURITY DEFINER` mínimas (`get_public_busy_intervals`, `get_appointment_by_cancel_token`, `cancel_appointment_by_token`) y el endpoint `POST /api/bookings`.
 - Las rutas `/admin`, `/setup`, `/api/admin/*` y `/api/notifications/reminder` requieren cookie de sesión `HttpOnly` firmada con HMAC.
-- El webhook de PayPal valida firma criptográfica obligatoria, moneda `EUR` e importe cobrado de forma fail-closed.
 
----
+## Uso
 
-## Licencia y Propiedad Intelectual
-
-**Copyright © 2026-2027 Álvaro. Todos los derechos reservados.**
-
-Este proyecto está protegido bajo una **Licencia Comercial Propietaria Anti-Plagio** ([LICENSE.md](LICENSE.md)). 
-- **NO es software de código abierto (Not Open Source).** 
-- La publicación de este código fuente en GitHub tiene como único fin permitir el despliegue automatizado en Vercel para clientes con licencia oficial.
-- Queda **estrictamente prohibida** la copia, reventa, sublicencia, plagio, distribución pública, modificación de marca (White-Labeling) o explotación comercial sin una clave de licencia (`LICENSE_KEY`) legalmente emitida por el titular.
-- Cualquier vulneración de los derechos de autor será perseguida judicialmente ante los Tribunales competentes conforme al RDL 1/1996 de Propiedad Intelectual y el Código Penal. Para licencias comerciales o soporte: `[correo eliminado]`.
-
+Gratis para tu propio negocio. No se puede vender ni presentar como propio. Se ofrece sin garantías: ver [LICENSE](LICENSE).

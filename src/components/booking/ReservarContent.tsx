@@ -11,7 +11,6 @@ import {
   Clock,
   UserCheck,
   AlertTriangle,
-  ShieldAlert,
   ArrowRight,
   RefreshCw,
   Lock,
@@ -273,40 +272,7 @@ export function ReservarContent({
     { num: 3, label: 'Tus Datos', icon: UserCheck },
   ]
 
-  // Caso 1: Licencia inválida / caducada / faltante en producción
-  if (bookingData.licenseBlocked) {
-    return (
-      <div className="min-h-dvh bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md w-full rounded-2xl bg-zinc-900/70 border border-white/10 p-6 sm:p-8 space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
-            <ShieldAlert className="w-6 h-6" />
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight text-white">
-            Agenda temporalmente pausada
-          </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed">
-            La reserva online de este establecimiento está pendiente de
-            activación administrativa.
-          </p>
-          {settings.telefono_contacto && (
-            <p className="text-xs font-mono text-zinc-300">
-              Contacto directo: {settings.telefono_contacto}
-            </p>
-          )}
-          <div className="pt-2">
-            <Link
-              href="/setup"
-              className="inline-flex min-h-12 px-5 items-center justify-center rounded-xl bg-zinc-800 border border-white/10 text-xs font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
-            >
-              Ir al Panel / Setup (Propietario)
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Caso 2: Negocio aún sin setup inicial o sin servicios activos
+  // Caso 1: Negocio aún sin setup inicial o sin servicios activos
   if (bookingData.needsSetup || services.length === 0) {
     return (
       <div className="min-h-dvh bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">

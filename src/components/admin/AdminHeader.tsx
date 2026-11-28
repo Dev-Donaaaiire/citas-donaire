@@ -9,16 +9,13 @@ import {
   Copy,
   Check,
   Loader2,
-  ShieldCheck,
   Sparkles,
-  AlertTriangle,
   Settings,
   LogOut,
   Smartphone,
 } from 'lucide-react'
 import { triggerDemoReset } from '@/lib/booking-service'
 import type { BusinessSettings } from '@/types/booking'
-import type { LicenseVerificationResult } from '@/lib/license'
 import { useIsDemo } from '@/lib/use-is-demo'
 import { useFeedback } from '@/components/ui/FeedbackProvider'
 import { cn } from '@/lib/utils'
@@ -28,7 +25,6 @@ import { CURRENT_SYSTEM_VERSION, type SystemVersionInfo } from '@/lib/version'
 
 interface AdminHeaderProps {
   settings: BusinessSettings | null
-  license?: LicenseVerificationResult | null
   isSandboxFallback?: boolean
   onDemoReset?: () => void
   onRefresh?: () => void
@@ -36,7 +32,6 @@ interface AdminHeaderProps {
 
 export function AdminHeader({
   settings,
-  license,
   isSandboxFallback = false,
   onDemoReset,
   onRefresh,
@@ -218,19 +213,6 @@ export function AdminHeader({
                   <Sparkles className="w-2.5 h-2.5" />
                   <span>{isSandboxFallback ? 'Demo Sandbox' : 'Modo Demo'}</span>
                 </span>
-              ) : license?.status === 'active' ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <ShieldCheck className="w-2.5 h-2.5" />
-                  <span>Licencia Activa</span>
-                </span>
-              ) : license && license.status !== 'demo' ? (
-                <Link
-                  href="/setup"
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
-                >
-                  <AlertTriangle className="w-2.5 h-2.5" />
-                  <span>Licencia: {license.status}</span>
-                </Link>
               ) : null}
 
               {!isDemoRoute && (

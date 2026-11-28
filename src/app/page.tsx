@@ -11,22 +11,22 @@ import { getPublicBookingInitialData } from '@/lib/data/public-booking'
 export async function generateMetadata(): Promise<Metadata> {
   if (showSalesLanding) {
     return {
-      title: 'Krono / Donaire Citas · Reservas online por 14,99 € pago único',
+      title: 'Krono · Reservas online gratis para negocios con cita previa',
       description:
-        'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y sin cuotas mensuales del software.',
+        'Reservas online gratis con 3 diseños, panel del dueño y avisos para recuperar clientes.',
       openGraph: {
-        title: 'Krono / Donaire Citas · Reservas online por 14,99 € pago único',
+        title: 'Krono · Reservas online gratis para negocios con cita previa',
         description:
-          'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y sin cuotas mensuales del software.',
+          'Reservas online gratis con 3 diseños, panel del dueño y avisos para recuperar clientes.',
         type: 'website',
         locale: 'es_ES',
         siteName: 'Krono / Donaire Citas',
       },
       twitter: {
         card: 'summary_large_image',
-        title: 'Krono / Donaire Citas · Reservas online por 14,99 € pago único',
+        title: 'Krono · Reservas online gratis para negocios con cita previa',
         description:
-          'Sistema propio de citas para barberías, clínicas, centros de estética, tatuadores y coaches. 3 diseños de lujo, panel del dueño anti no-show y sin cuotas mensuales del software.',
+          'Reservas online gratis con 3 diseños, panel del dueño y avisos para recuperar clientes.',
       },
     }
   }

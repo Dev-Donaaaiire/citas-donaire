@@ -9,7 +9,6 @@ import {
   Copy,
   Check,
   Database,
-  ShieldCheck,
   Sparkles,
   Plus,
   Trash2,
@@ -456,31 +455,6 @@ export function SetupContent({
                     : `Faltan tablas: ${diagnostics.missingTables.join(', ')}. Ejecuta el Paso 1.`}
             </p>
           </div>
-
-          {/* Card 3: Licencia Comercial */}
-          <div className="p-4 rounded-2xl bg-zinc-900/60 border border-white/10 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                3. Licencia
-              </span>
-              {diagnostics.license.valid ? (
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              ) : (
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
-              )}
-            </div>
-            <p className="text-sm font-semibold text-white uppercase font-mono">
-              {diagnostics.license.status}
-            </p>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              {diagnostics.license.message}
-            </p>
-            {diagnostics.license.dominioAutorizado && (
-              <p className="text-[11px] font-mono text-zinc-300 truncate">
-                Dominio: {diagnostics.license.dominioAutorizado}
-              </p>
-            )}
-          </div>
         </section>
 
         {/* PASO 1: Script SQL Endurecido */}
@@ -749,7 +723,7 @@ export function SetupContent({
               </span>
               <span className="block text-[11px] text-zinc-400 mt-0.5">
                 En producción (<code className="font-mono">modo_demo = false</code>
-                ), la licencia comercial debe ser válida y <code className="font-mono">/demo</code> queda aislado en sandbox.
+                ), las reservas son reales y <code className="font-mono">/demo</code> queda aislado en sandbox.
               </span>
             </div>
             <input

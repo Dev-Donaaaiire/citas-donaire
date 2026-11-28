@@ -4,7 +4,6 @@ import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
-import { checkProductionLicenseGate } from '@/lib/license'
 import {
   DEMO_SANDBOX_COOKIE_NAME,
   DEMO_SANDBOX_SERVICES,
@@ -30,8 +29,6 @@ export interface PublicBookingInitialData {
   settings: BusinessPublicSettings
   busyIntervals: PublicBusyInterval[]
   isSandboxFallback: boolean
-  licenseBlocked: boolean
-  licenseMessage: string | null
   needsSetup: boolean
 }
 
@@ -132,8 +129,6 @@ const fetchPublicBookingInitialData = cache(
         settings: DEMO_SANDBOX_SETTINGS,
         busyIntervals: getDemoSandboxBusyIntervals(deltaCookie),
         isSandboxFallback: true,
-        licenseBlocked: false,
-        licenseMessage: null,
         needsSetup: false,
       }
     }
@@ -145,8 +140,6 @@ const fetchPublicBookingInitialData = cache(
           settings: DEMO_SANDBOX_SETTINGS,
           busyIntervals: getDemoSandboxBusyIntervals(deltaCookie),
           isSandboxFallback: true,
-          licenseBlocked: false,
-          licenseMessage: null,
           needsSetup: false,
         }
       }
@@ -162,8 +155,6 @@ const fetchPublicBookingInitialData = cache(
         },
         busyIntervals: [],
         isSandboxFallback: false,
-        licenseBlocked: false,
-        licenseMessage: null,
         needsSetup: true,
       }
     }
@@ -237,21 +228,11 @@ const fetchPublicBookingInitialData = cache(
       }))
     }
 
-    let licenseBlocked = false
-    let licenseMessage: string | null = null
-    if (!isDemoRoute && !settings.modo_demo) {
-      const gate = await checkProductionLicenseGate(false)
-      licenseBlocked = gate.blocked
-      licenseMessage = gate.blocked ? gate.license.message : null
-    }
-
     return {
       services,
       settings,
       busyIntervals,
       isSandboxFallback: false,
-      licenseBlocked,
-      licenseMessage,
       needsSetup: false,
     }
   } catch (err) {
@@ -262,8 +243,6 @@ const fetchPublicBookingInitialData = cache(
         settings: DEMO_SANDBOX_SETTINGS,
         busyIntervals: getDemoSandboxBusyIntervals(deltaCookie),
         isSandboxFallback: true,
-        licenseBlocked: false,
-        licenseMessage: null,
         needsSetup: false,
       }
     }
@@ -279,8 +258,6 @@ const fetchPublicBookingInitialData = cache(
       },
       busyIntervals: [],
       isSandboxFallback: false,
-      licenseBlocked: false,
-      licenseMessage: null,
       needsSetup: true,
     }
   }

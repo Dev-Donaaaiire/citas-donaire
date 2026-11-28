@@ -3,10 +3,6 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
 import {
-  checkProductionLicenseGate,
-  type LicenseVerificationResult,
-} from '@/lib/license'
-import {
   DEMO_SANDBOX_COOKIE_NAME,
   getDemoSandboxAdminDataset,
 } from '@/lib/demo-sandbox'
@@ -95,8 +91,6 @@ export interface AdminDashboardPayload {
     fromIso: string
     toIso: string
   }
-  license: LicenseVerificationResult
-  licenseBlocked: boolean
   isSandboxFallback: boolean
   dueClients?: DueClient[]
   waiting?: { id: string; nombre: string; fecha: string }[]
@@ -118,17 +112,6 @@ export async function getAdminDashboardData(options?: {
   const filter = options?.clientFilter || 'all'
   const search = options?.clientSearch?.trim() || ''
 
-  const fallbackLicense: LicenseVerificationResult = {
-    valid: true,
-    unlimited: false,
-    status: 'demo',
-    licenseKey: null,
-    plan: null,
-    dominioAutorizado: null,
-    checkedAt: new Date().toISOString(),
-    source: 'demo_mode',
-    message: 'Entorno sandbox aislado de demostración.',
-  }
 
   const resolveSandboxDelta = async () => {
     if (typeof options?.sandboxDeltaCookie === 'string') {
@@ -173,8 +156,6 @@ export async function getAdminDashboardData(options?: {
         fromIso: new Date(Date.now() - 7 * 86_400_000).toISOString(),
         toIso: new Date(Date.now() + 45 * 86_400_000).toISOString(),
       },
-      license: fallbackLicense,
-      licenseBlocked: false,
       isSandboxFallback: true,
     }
   }
@@ -221,8 +202,6 @@ export async function getAdminDashboardData(options?: {
         fromIso: new Date(Date.now() - 7 * 86_400_000).toISOString(),
         toIso: new Date(Date.now() + 45 * 86_400_000).toISOString(),
       },
-      license: fallbackLicense,
-      licenseBlocked: false,
       isSandboxFallback: true,
     }
   }
@@ -300,7 +279,6 @@ export async function getAdminDashboardData(options?: {
     atRiskCountRes,
     blockedCountRes,
     metricsApptsRes,
-    gate,
   ] = await Promise.all([
     db.from('services').select('*').order('orden', { ascending: true }),
     db
@@ -335,9 +313,6 @@ export async function getAdminDashboardData(options?: {
       .lte('fecha_hora_inicio', metricsToIso)
       .neq('estado', 'cancelada')
       .limit(1000),
-    demoRoute
-      ? Promise.resolve({ blocked: false, license: fallbackLicense })
-      : checkProductionLicenseGate(Boolean(settingsRow?.modo_demo)),
   ])
 
   const normalizedSettings: BusinessSettings | null = settingsRow
@@ -391,8 +366,6 @@ export async function getAdminDashboardData(options?: {
       fromIso,
       toIso,
     },
-    license: gate.license,
-    licenseBlocked: demoRoute ? false : gate.blocked,
     isSandboxFallback: false,
   }
 }

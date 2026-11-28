@@ -30,14 +30,14 @@ function getValidMetadataBase(raw?: string): URL | undefined {
 
 export const metadata: Metadata = {
   metadataBase: getValidMetadataBase(process.env.NEXT_PUBLIC_APP_URL),
-  title: 'Sistema de citas online por 14,99 € · Pago único | Krono / Donaire Citas',
+  title: 'Krono · Reservas online gratis para negocios con cita previa',
   description:
-    'Deja de perder clientes por teléfono. Sistema de citas con 3 diseños exclusivos, seguimiento de clientes que no vuelven y avisos al calendario. Sin cuotas mensuales del software.',
+    'Reservas online gratis con 3 diseños, panel del dueño y avisos para recuperar clientes.',
   openGraph: {
     title:
-      'Sistema de citas online por 14,99 € · Pago único | Krono / Donaire Citas',
+      'Krono · Reservas online gratis para negocios con cita previa',
     description:
-      'Deja de perder clientes por teléfono. Sistema de citas con 3 diseños exclusivos, seguimiento de clientes que no vuelven y avisos al calendario. Sin cuotas mensuales del software.',
+      'Reservas online gratis con 3 diseños, panel del dueño y avisos para recuperar clientes.',
     type: 'website',
     locale: 'es_ES',
     siteName: 'Krono / Donaire Citas',
@@ -45,9 +45,9 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title:
-      'Sistema de citas online por 14,99 € · Pago único | Krono / Donaire Citas',
+      'Krono · Reservas online gratis para negocios con cita previa',
     description:
-      'Deja de perder clientes por teléfono. Sistema de citas con 3 diseños exclusivos, seguimiento de clientes que no vuelven y avisos al calendario. Sin cuotas mensuales del software.',
+      'Reservas online gratis con 3 diseños, panel del dueño y avisos para recuperar clientes.',
   },
 }
 

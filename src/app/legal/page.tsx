@@ -9,9 +9,9 @@ import {
 } from '@/lib/legal'
 
 export const metadata: Metadata = {
-  title: 'Información legal · Krono / Donaire Citas',
+  title: 'Información legal · Krono',
   description:
-    'Términos de Licencia de Software, Aviso Legal y Política de Privacidad (España).',
+    'Condiciones de uso y política de privacidad.',
 }
 
 export default function LegalPage() {
@@ -62,7 +62,7 @@ export default function LegalPage() {
               <span>Aviso de configuración (solo visible hasta completarla)</span>
             </div>
             <p>
-              Faltan datos legales del titular. Define estas variables de entorno
+              Faltan datos del responsable. Define estas variables de entorno
               antes de publicar; los marcadores entre corchetes del texto
               inferior son provisionales y no son datos reales:
             </p>

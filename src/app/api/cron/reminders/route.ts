@@ -1,7 +1,6 @@
 import { connection, NextRequest, NextResponse } from 'next/server'
 import { sendNoticeEmail } from '@/lib/email-service'
 import { formatTime } from '@/lib/format'
-import { checkProductionLicenseGate } from '@/lib/license'
 import { checkPersistentRateLimit, getClientIp } from '@/lib/rate-limit'
 import { getSupabaseAdmin, hasSupabaseAdminConfig } from '@/lib/supabase-admin'
 import {
@@ -40,8 +39,6 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .maybeSingle()
     if (!settings) return NextResponse.json({ sent: 0 })
-    const gate = await checkProductionLicenseGate(Boolean(settings.modo_demo))
-    if (gate.blocked) return NextResponse.json({ sent: 0 })
 
     const tz = sanitizeTimeZone(settings.timezone)
     const today = getTodayIsoInTimeZone(tz)

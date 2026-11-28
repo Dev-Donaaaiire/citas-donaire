@@ -4,9 +4,10 @@ import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { CalendarCheck, LayoutDashboard, ShoppingBag } from 'lucide-react'
+import { CalendarCheck, LayoutDashboard, Star } from 'lucide-react'
 import { useTheme } from '@/components/theme/ThemeProvider'
 import { cn } from '@/lib/utils'
+import { REPO_URL } from '@/lib/project'
 
 const SPRING = { type: 'spring', stiffness: 380, damping: 30 } as const
 
@@ -117,19 +118,16 @@ export function DemoTopBar() {
           })}
         </nav>
 
-        {/* CTA de compra */}
-        <Link
-          href="/#precios"
+        {/* Enlace al repositorio */}
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           className="ml-auto flex min-h-12 shrink-0 touch-manipulation select-none items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3.5 text-xs font-semibold text-zinc-950 shadow-[0_0_22px_rgb(var(--glow-rgb)/0.35)] transition-all hover:bg-emerald-400 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 sm:px-4 sm:text-sm"
         >
-          <ShoppingBag className="h-4 w-4 shrink-0" strokeWidth={1.9} />
-          <span className="whitespace-nowrap xl:hidden">
-            <span className="hidden sm:inline">Comprar · </span>14,99 €
-          </span>
-          <span className="hidden whitespace-nowrap xl:inline">
-            Comprar este sistema por 14,99 € (Pago único)
-          </span>
-        </Link>
+          <Star className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+          <span className="whitespace-nowrap">GitHub</span>
+        </a>
       </div>
     </div>
   )
