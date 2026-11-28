@@ -13,6 +13,7 @@ import { AdminMetricsGrid } from '@/components/admin/AdminMetricsGrid'
 import { AdminAgendaView } from '@/components/admin/AdminAgendaView'
 import { AdminClientRetentionTable } from '@/components/admin/AdminClientRetentionTable'
 import { AdminUpdateBanner } from '@/components/admin/AdminUpdateBanner'
+import { AdminStoryButton } from '@/components/admin/AdminStoryButton'
 import { FeedbackProvider } from '@/components/ui/FeedbackProvider'
 import { cn } from '@/lib/utils'
 
@@ -181,6 +182,8 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+          <AdminStoryButton isDemo={isDemoRoute} />
           <button
             type="button"
             disabled={isRefreshing}
@@ -192,6 +195,7 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
             />
             <span>Actualizar</span>
           </button>
+          </div>
         </div>
 
         {/* Vistas principales */}
