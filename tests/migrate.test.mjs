@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { X509Certificate } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { test } from 'node:test'
 import { PGlite } from '@electric-sql/pglite'
@@ -82,4 +83,14 @@ test('valida siempre el certificado del servidor', () => {
     assert.equal(withCa.ca.at(-1), 'CA')
   }
   assert.equal(sslConfig('postgresql://a:b@127.0.0.1/p', {}, null), false)
+})
+
+test('el certificado de Supabase incluido es una CA vigente', () => {
+  const ca = new X509Certificate(readFileSync(new URL('../src/db/supabase-ca.crt', import.meta.url)))
+  assert.equal(ca.ca, true)
+  // Avisa seis meses antes para publicar el certificado nuevo
+  assert.ok(Date.parse(ca.validTo) - Date.now() > 180 * 86_400_000, 'caduca el ' + ca.validTo)
+  const config = sslConfig('postgresql://a:b@x.pooler.supabase.com/p', {})
+  assert.equal(config.rejectUnauthorized, true)
+  assert.ok(config.ca.at(-1).includes('BEGIN CERTIFICATE'))
 })
