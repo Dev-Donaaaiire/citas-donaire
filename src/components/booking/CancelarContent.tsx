@@ -46,6 +46,23 @@ export function CancelarContent({
     initialAppointment?.estado === 'cancelada'
   )
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [attendance, setAttendance] = useState<'idle' | 'sending' | 'confirmed'>('idle')
+
+  const handleConfirmAttendance = async () => {
+    setAttendance('sending')
+    setErrorMsg(null)
+    const response = await fetch('/api/bookings/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }).catch(() => null)
+    if (response?.ok) {
+      setAttendance('confirmed')
+    } else {
+      setAttendance('idle')
+      setErrorMsg('No pudimos registrar tu confirmación. Inténtalo de nuevo.')
+    }
+  }
 
   // Resincroniza el estado cuando llegan datos nuevos del servidor
   // (ajuste durante el render; un cambio de token remonta vía `key`).
@@ -262,6 +279,20 @@ export function CancelarContent({
 
                 {/* Botones de acción claros y sin cancelación accidental */}
                 <div className="space-y-3 pt-2">
+                  {appointment.estado === 'confirmada' && (
+                    <button
+                      type="button"
+                      onClick={handleConfirmAttendance}
+                      disabled={attendance !== 'idle'}
+                      className="w-full min-h-12 px-5 rounded-xl ui-btn-contrast font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>
+                        {attendance === 'confirmed' ? 'Asistencia confirmada' : 'Confirmo que voy'}
+                      </span>
+                    </button>
+                  )}
+
                   <Link
                     href={`/reservar?rescheduleToken=${encodeURIComponent(token)}&serviceId=${encodeURIComponent(appointment.service_id)}`}
                     className="w-full min-h-12 px-5 rounded-xl bg-emerald-500 text-zinc-950 font-semibold text-sm hover:bg-emerald-400 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10"

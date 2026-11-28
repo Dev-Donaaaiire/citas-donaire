@@ -16,6 +16,7 @@ import {
   calculateAvailableSlots,
   timeStringToMinutes,
 } from '@/lib/calendar'
+import { notifyWaitlist } from '@/lib/waitlist'
 import type {
   Appointment,
   BusinessPublicSettings,
@@ -611,6 +612,9 @@ export async function createServerBooking(
     timezone: tz,
     campos_formulario: formRules,
   }
+
+  // El hueco que deja una reprogramación puede interesar a quien espera
+  if (rescheduleApt && !isSimulated) await notifyWaitlist(rescheduleApt.fecha_hora_inicio)
 
   return {
     result: {

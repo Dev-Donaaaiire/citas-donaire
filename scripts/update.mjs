@@ -22,6 +22,7 @@ const OVERLAID = [
   'tsconfig.json',
   'eslint.config.mjs',
   'components.json',
+  'vercel.json',
   'README.md',
 ]
 

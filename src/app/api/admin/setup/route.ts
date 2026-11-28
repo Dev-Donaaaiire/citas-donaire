@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       emailNotificaciones?: string | null
       direccion?: string | null
       telefonoContacto?: string | null
+      urlResenas?: string | null
       timezone?: string | null
       horarioApertura?: string
       horarioCierre?: string
@@ -174,6 +175,22 @@ export async function POST(request: NextRequest) {
         throw new Error(insertErr?.message || 'Error al crear la configuración inicial')
       }
       savedSettingsId = created.id
+    }
+
+    // Aparte: una base sin migrar no debe impedir guardar el resto
+    if (typeof body.urlResenas === 'string') {
+      const url = body.urlResenas.trim()
+      if (url && !/^https:\/\/\S+$/.test(url)) {
+        return NextResponse.json(
+          { error: 'El enlace de reseñas debe empezar por https://' },
+          { status: 400 }
+        )
+      }
+      const { error: reviewErr } = await db
+        .from('business_settings')
+        .update({ url_resenas: url || null })
+        .eq('id', savedSettingsId)
+      if (reviewErr) console.warn('[api/admin/setup] url_resenas:', reviewErr.message)
     }
 
     // 2. Sincronizar servicios y desactivar (activo: false) los que existían en BD pero el usuario quitó

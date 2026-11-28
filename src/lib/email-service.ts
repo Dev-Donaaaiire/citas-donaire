@@ -159,6 +159,44 @@ function renderEmailShell({
 </html>`
 }
 
+/** Aviso breve con botones. Devuelve false si no se pudo entregar. */
+export async function sendNoticeEmail(input: {
+  to: string
+  businessName: string
+  subject: string
+  title: string
+  paragraphs: string[]
+  actions: { label: string; url: string }[]
+}): Promise<boolean> {
+  const resend = getResendClient()
+  if (!resend) return false
+
+  const bodyHtml = [
+    ...input.paragraphs.map(
+      (text) => `<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#d4d4d8;">${escapeHtml(text)}</p>`
+    ),
+    ...input.actions.map(
+      (action) => `<p style="margin:0 0 10px;"><a href="${escapeHtml(action.url)}" style="display:block;text-align:center;padding:13px 20px;border-radius:10px;background-color:#18181b;border:1px solid #3f3f46;color:#f4f4f5;font-size:14px;font-weight:700;text-decoration:none;">${escapeHtml(action.label)}</a></p>`
+    ),
+  ].join('')
+
+  const { error } = await resend.emails.send({
+    from: DEFAULT_FROM,
+    to: input.to,
+    subject: input.subject,
+    html: renderEmailShell({
+      preheader: input.paragraphs[0] ?? input.title,
+      badge: input.businessName,
+      title: input.title,
+      subtitle: input.businessName,
+      bodyHtml,
+      footerNote: `${input.businessName} · Mensaje automático de tu reserva`,
+    }),
+  })
+  if (error) console.warn('[sendNoticeEmail] No entregado:', error.message)
+  return !error
+}
+
 export function buildOwnerBookingEmailHtml(params: {
   businessName: string
   serviceName: string

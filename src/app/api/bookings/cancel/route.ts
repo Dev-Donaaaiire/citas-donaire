@@ -5,6 +5,7 @@ import {
   DEMO_CANCEL_TOKEN_PREFIX,
   getCancelAppointmentInitialData,
 } from '@/lib/data/cancel-booking'
+import { notifyWaitlist } from '@/lib/waitlist'
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -110,6 +111,15 @@ export async function POST(request: NextRequest) {
         },
         { status: result.reason === 'not_found' ? 404 : 409 }
       )
+    }
+
+    if (hasSupabaseAdminConfig() && result.id) {
+      const { data: freed } = await getSupabaseAdmin()
+        .from('appointments')
+        .select('fecha_hora_inicio')
+        .eq('id', result.id)
+        .maybeSingle()
+      if (freed) await notifyWaitlist(freed.fecha_hora_inicio)
     }
 
     return NextResponse.json({

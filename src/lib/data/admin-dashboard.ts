@@ -27,6 +27,8 @@ import {
   zonedDateTimeToUtc,
 } from '@/lib/timezone'
 import { sendAppointmentRescheduleNoticeEmail } from '@/lib/email-service'
+import { findDueClients, type DueClient, type VisitRow } from '@/lib/retention'
+import { notifyWaitlist } from '@/lib/waitlist'
 
 export interface ExecutiveMetrics {
   todayAppointmentsCount: number
@@ -96,6 +98,8 @@ export interface AdminDashboardPayload {
   license: LicenseVerificationResult
   licenseBlocked: boolean
   isSandboxFallback: boolean
+  dueClients?: DueClient[]
+  waiting?: { id: string; nombre: string; fecha: string }[]
 }
 
 export async function getAdminDashboardData(options?: {
@@ -344,7 +348,28 @@ export async function getAdminDashboardData(options?: {
       }
     : null
 
+  // Fuera del Promise.all principal: si la base aún no tiene la lista de espera,
+  // el resto del panel sigue funcionando.
+  const [visitsRes, waitingRes] = await Promise.all([
+    db
+      .from('appointments')
+      .select('client_id, fecha_hora_inicio, client:clients(nombre, telefono, bloqueado_no_show)')
+      .in('estado', ['confirmada', 'completada'])
+      .gte('fecha_hora_inicio', new Date(Date.now() - 400 * 86_400_000).toISOString())
+      .order('fecha_hora_inicio', { ascending: false })
+      .limit(2000),
+    db
+      .from('waitlist')
+      .select('id, nombre, fecha')
+      .is('notified_at', null)
+      .gte('fecha', todayIso)
+      .order('fecha', { ascending: true })
+      .limit(50),
+  ])
+
   return {
+    dueClients: findDueClients((visitsRes.data ?? []) as unknown as VisitRow[]),
+    waiting: waitingRes.data ?? [],
     settings: normalizedSettings,
     services: servicesRes.data ?? [],
     appointments: (apptsRes.data ?? []) as Appointment[],
@@ -379,7 +404,7 @@ export async function updateAppointmentStatusServer(
   const db = getSupabaseAdmin()
   const { data: currentAppt, error: fetchErr } = await db
     .from('appointments')
-    .select('id, client_id, fecha_hora_fin, estado')
+    .select('id, client_id, fecha_hora_inicio, fecha_hora_fin, estado')
     .eq('id', appointmentId)
     .maybeSingle()
 
@@ -441,6 +466,10 @@ export async function updateAppointmentStatusServer(
         )
       }
     }
+  }
+
+  if (newStatus === 'cancelada' && currentAppt.estado === 'confirmada') {
+    await notifyWaitlist(currentAppt.fecha_hora_inicio)
   }
 
   return { success: true }
@@ -600,9 +629,14 @@ export async function createBlockedSlotServer(params: {
 
 export async function deleteBlockedSlotServer(id: string) {
   const db = getSupabaseAdmin()
-  const { error } = await db.from('blocked_slots').delete().eq('id', id)
+  const { data: removed, error } = await db
+    .from('blocked_slots')
+    .delete()
+    .eq('id', id)
+    .select('fecha_inicio')
   if (error) {
     throw new Error(`Error al eliminar bloqueo: ${error.message}`)
   }
+  if (removed?.[0]) await notifyWaitlist(removed[0].fecha_inicio)
   return { success: true }
 }

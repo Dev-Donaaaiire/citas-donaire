@@ -200,7 +200,7 @@ export function AdminHeader({
   }
 
   return (
-    <header className="border-b border-white/10 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-30">
+    <header className="border-b border-white/10 bg-zinc-950/90 backdrop-blur-md sm:sticky sm:top-0 z-30">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-16 py-2.5 flex flex-wrap items-center justify-between gap-3">
         {/* Marca del propietario */}
         <div className="flex items-center gap-3 min-w-0">

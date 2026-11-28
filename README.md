@@ -39,6 +39,19 @@ Cada lunes, el workflow `krono-sync.yml` trae la última versión publicada, eje
 
 **Retirar una versión defectuosa:** añádela a `withdrawn-versions.json` en `main` (p. ej. `["v1.6.0"]`). Nadie la instalará desde ese momento. A quien ya la tenga no se le revierte: publica una versión superior con la corrección.
 
+## Funciones para crecer
+
+| Función | Dónde | Qué necesita |
+|---|---|---|
+| Huecos para Stories | Panel → "Huecos para Stories" | Nada |
+| Recordatorio por WhatsApp | Agenda, en cada cita | Teléfono del cliente |
+| Pedir reseña | Agenda, en citas completadas | Enlace de reseñas en `/setup` |
+| Te toca volver | Panel → Clientes | Historial de citas |
+| Recordatorio del día antes con confirmación | Automático, cada tarde (`vercel.json`) | Resend con dominio verificado |
+| Lista de espera | Página de reserva | Resend con dominio verificado |
+
+El recordatorio lo lanza el cron de Vercel a las 16:00 UTC. En otro alojamiento hay que llamar una vez al día a `/api/cron/reminders`. Si se define `CRON_SECRET`, la llamada debe enviar `Authorization: Bearer <valor>` (Vercel lo hace solo).
+
 ## Flujo recomendado para compradores
 
 1. Accede a `/setup` tras iniciar sesión en `/admin/login`.

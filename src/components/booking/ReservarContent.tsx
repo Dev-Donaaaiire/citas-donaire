@@ -1,5 +1,6 @@
 'use client'
 
+import { WaitlistForm } from '@/components/booking/WaitlistForm'
 import React, { useMemo, useState, useLayoutEffect } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -566,6 +567,10 @@ export function ReservarContent({
                     selectedSlot={selectedSlot}
                     onSelectSlot={setSelectedSlot}
                   />
+
+                  {!isDemoRoute && (
+                    <WaitlistForm key={selectedService.id} serviceId={selectedService.id} timezone={tz} />
+                  )}
 
                   {/* CTA Continuar visible en desktop debajo de los horarios */}
                   <div className="hidden sm:flex flex-col gap-2 pt-2">

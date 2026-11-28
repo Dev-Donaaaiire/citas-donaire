@@ -92,6 +92,7 @@ export function SetupContent({
     initialSettings?.email_notificaciones || ''
   )
   const [direccion, setDireccion] = useState(initialSettings?.direccion || '')
+  const [urlResenas, setUrlResenas] = useState(initialSettings?.url_resenas || '')
   const [telefonoContacto, setTelefonoContacto] = useState(
     initialSettings?.telefono_contacto || ''
   )
@@ -163,6 +164,7 @@ export function SetupContent({
         setEmailNotificaciones(fresh.settings.email_notificaciones || '')
         setDireccion(fresh.settings.direccion || '')
         setTelefonoContacto(fresh.settings.telefono_contacto || '')
+        setUrlResenas(fresh.settings.url_resenas || '')
         setTimezone(fresh.settings.timezone || 'Europe/Madrid')
         setHorarioApertura(
           (fresh.settings.horario_apertura || '09:00').slice(0, 5)
@@ -248,6 +250,7 @@ export function SetupContent({
           emailNotificaciones,
           direccion,
           telefonoContacto,
+          urlResenas,
           timezone,
           horarioApertura,
           horarioCierre,
@@ -611,6 +614,20 @@ export function SetupContent({
                 value={telefonoContacto}
                 onChange={(e) => setTelefonoContacto(e.target.value)}
                 placeholder="Ej. +34 600 000 000"
+                className="w-full min-h-12 px-3.5 rounded-xl bg-zinc-950 border border-white/10 text-sm text-white focus:outline-none focus:border-emerald-500/60"
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="setup-reviews" className="text-xs font-medium text-zinc-300">
+                Enlace para dejar reseñas (opcional)
+              </label>
+              <input
+                id="setup-reviews"
+                type="url"
+                value={urlResenas}
+                onChange={(e) => setUrlResenas(e.target.value)}
+                placeholder="https://g.page/r/.../review"
                 className="w-full min-h-12 px-3.5 rounded-xl bg-zinc-950 border border-white/10 text-sm text-white focus:outline-none focus:border-emerald-500/60"
               />
             </div>

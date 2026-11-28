@@ -41,8 +41,8 @@ const policies = async (db) =>
 
 test('instalación nueva y segunda ejecución sin cambios', async () => {
   await withDatabase(async (db, url) => {
-    assert.deepEqual(await migrate(url, quiet), ['initial-sql'])
-    assert.deepEqual(await names(db), files.filter((f) => f <= BASELINE))
+    assert.deepEqual(await migrate(url, quiet), ['initial-sql', ...files.filter((f) => f > BASELINE)])
+    assert.deepEqual(await names(db), files)
     assert.deepEqual(await policies(db), ['services_select_anon'])
     await db.exec('SET ROLE anon')
     const visible = await db.query('SELECT * FROM public.krono_migrations')
@@ -62,6 +62,9 @@ test('adopta una instalación hecha a mano sin perder datos y cierra permisos', 
     await migrate(url, quiet)
     const after = (await db.query('SELECT count(*)::int c FROM public.clients')).rows[0].c
     assert.equal(after, before)
+    // Las migraciones posteriores al script también quedan aplicadas
+    await db.query('SELECT fecha FROM public.waitlist')
+    await db.query('SELECT confirmada_cliente_at FROM public.appointments')
     assert.deepEqual(await policies(db), ['services_select_anon'])
   })
 })

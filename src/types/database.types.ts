@@ -24,6 +24,8 @@ export type Database = {
           service_id: string
           token_cancelacion: string
           updated_at?: string
+          recordatorio_enviado_at?: string | null
+          confirmada_cliente_at?: string | null
         }
         Insert: {
           client_id: string
@@ -48,6 +50,8 @@ export type Database = {
           service_id?: string
           token_cancelacion?: string
           updated_at?: string
+          recordatorio_enviado_at?: string | null
+          confirmada_cliente_at?: string | null
         }
         Relationships: [
           {
@@ -110,11 +114,13 @@ export type Database = {
           tema_activo: 'dark_luxury' | 'clean_minimal' | 'neon_creator'
           timezone: string
           campos_formulario?: Json | null
+          url_resenas?: string | null
           ultima_restauracion_demo: string | null
           updated_at?: string
         }
         Insert: {
           campos_formulario?: Json | null
+          url_resenas?: string | null
           created_at?: string
           dias_laborables?: Json
           direccion?: string | null
@@ -134,6 +140,7 @@ export type Database = {
         }
         Update: {
           campos_formulario?: Json | null
+          url_resenas?: string | null
           created_at?: string
           dias_laborables?: Json
           direccion?: string | null
@@ -267,6 +274,36 @@ export type Database = {
           orden?: number
           precio?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      waitlist: {
+        Row: {
+          id: string
+          service_id: string
+          nombre: string
+          email: string
+          fecha: string
+          notified_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          service_id: string
+          nombre: string
+          email: string
+          fecha: string
+          notified_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          service_id?: string
+          nombre?: string
+          email?: string
+          fecha?: string
+          notified_at?: string | null
+          created_at?: string
         }
         Relationships: []
       }

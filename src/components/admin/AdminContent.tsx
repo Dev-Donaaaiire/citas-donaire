@@ -14,6 +14,7 @@ import { AdminAgendaView } from '@/components/admin/AdminAgendaView'
 import { AdminClientRetentionTable } from '@/components/admin/AdminClientRetentionTable'
 import { AdminUpdateBanner } from '@/components/admin/AdminUpdateBanner'
 import { AdminStoryButton } from '@/components/admin/AdminStoryButton'
+import { AdminGrowthPanel } from '@/components/admin/AdminGrowthPanel'
 import { FeedbackProvider } from '@/components/ui/FeedbackProvider'
 import { cn } from '@/lib/utils'
 
@@ -206,6 +207,7 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
               blockedSlots={data.blockedSlots}
               timezone={tz}
               businessName={data.settings?.nombre_negocio}
+              reviewUrl={data.settings?.url_resenas}
               isDemo={isDemoRoute}
               isSandboxFallback={data.isSandboxFallback}
               onRefresh={(newRange) => {
@@ -240,6 +242,13 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
               }}
             />
           ) : (
+            <>
+            <AdminGrowthPanel
+              dueClients={data.dueClients ?? []}
+              waiting={data.waiting ?? []}
+              businessName={data.settings?.nombre_negocio || 'nuestro negocio'}
+              isDemo={isDemoRoute}
+            />
             <AdminClientRetentionTable
               clients={data.clients}
               pagination={data.clientsPagination}
@@ -262,6 +271,7 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
                 }))
               }}
             />
+            </>
           )}
         </div>
       </main>

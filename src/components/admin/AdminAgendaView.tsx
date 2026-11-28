@@ -23,7 +23,8 @@ import {
 } from '@/lib/timezone'
 import { updateAppointmentStatus, deleteBlockedSlot } from '@/lib/booking-service'
 import { cn } from '@/lib/utils'
-import { WhatsAppReminderButton } from '@/components/admin/WhatsAppReminderButton'
+import { WhatsAppButton } from '@/components/admin/WhatsAppButton'
+import { buildReminderMessage } from '@/lib/whatsapp'
 import { AdminBlockSlotModal } from '@/components/admin/AdminBlockSlotModal'
 import { useFeedback } from '@/components/ui/FeedbackProvider'
 
@@ -32,6 +33,7 @@ interface AdminAgendaViewProps {
   blockedSlots: BlockedSlot[]
   timezone?: string | null
   businessName?: string
+  reviewUrl?: string | null
   isDemo?: boolean
   isSandboxFallback?: boolean
   onRefresh: (range?: { fromIso: string; toIso: string }) => void
@@ -48,6 +50,7 @@ export function AdminAgendaView({
   blockedSlots,
   timezone = 'Europe/Madrid',
   businessName = 'nuestro negocio',
+  reviewUrl,
   isDemo = false,
   isSandboxFallback = false,
   onRefresh,
@@ -386,6 +389,11 @@ export function AdminAgendaView({
                             {appt.client?.nombre || 'Cliente'}
                           </h4>
                           {statusBadge(appt.estado)}
+                          {appt.estado === 'confirmada' && appt.confirmada_cliente_at && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono border border-emerald-500/30 text-emerald-400">
+                              Confirmó
+                            </span>
+                          )}
                         </div>
 
                         <p className="text-xs text-zinc-300 flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -425,13 +433,37 @@ export function AdminAgendaView({
                     </div>
 
                     {/* Acciones rápidas >= 48px */}
+                    {appt.estado === 'completada' && reviewUrl && (
+                      <div className="flex shrink-0">
+                        <WhatsAppButton
+                          phone={appt.client?.telefono}
+                          label="Pedir reseña"
+                          ariaLabel={`Pedir reseña por WhatsApp a ${appt.client?.nombre || 'cliente'}`}
+                          isDemo={isDemo}
+                          message={() =>
+                            `Hola ${(appt.client?.nombre || '').split(/\s+/)[0]}, gracias por venir a ${businessName}. Si te ha gustado, ¿nos dejas una reseña? Nos ayuda mucho: ${reviewUrl}`
+                          }
+                        />
+                      </div>
+                    )}
+
                     {appt.estado === 'confirmada' && (
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        <WhatsAppReminderButton
-                          appointment={appt}
-                          timezone={tz}
-                          businessName={businessName}
+                        <WhatsAppButton
+                          phone={appt.client?.telefono}
+                          label="WhatsApp"
+                          ariaLabel={`Enviar recordatorio por WhatsApp a ${appt.client?.nombre || 'cliente'}`}
                           isDemo={isDemo}
+                          message={(origin) =>
+                            buildReminderMessage({
+                              clientName: appt.client?.nombre || 'Cliente',
+                              serviceName: appt.service?.nombre || 'tu servicio',
+                              startIso: appt.fecha_hora_inicio,
+                              timezone: tz,
+                              businessName,
+                              manageUrl: `${origin}/cancelar?token=${encodeURIComponent(appt.token_cancelacion)}`,
+                            })
+                          }
                         />
 
                         <button
