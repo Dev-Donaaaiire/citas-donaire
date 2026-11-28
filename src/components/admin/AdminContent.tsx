@@ -205,6 +205,7 @@ function AdminDashboardInner({ initialData }: AdminContentProps) {
               appointments={data.appointments}
               blockedSlots={data.blockedSlots}
               timezone={tz}
+              businessName={data.settings?.nombre_negocio}
               isDemo={isDemoRoute}
               isSandboxFallback={data.isSandboxFallback}
               onRefresh={(newRange) => {

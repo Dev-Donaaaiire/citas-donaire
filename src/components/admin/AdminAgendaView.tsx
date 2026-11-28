@@ -23,6 +23,7 @@ import {
 } from '@/lib/timezone'
 import { updateAppointmentStatus, deleteBlockedSlot } from '@/lib/booking-service'
 import { cn } from '@/lib/utils'
+import { WhatsAppReminderButton } from '@/components/admin/WhatsAppReminderButton'
 import { AdminBlockSlotModal } from '@/components/admin/AdminBlockSlotModal'
 import { useFeedback } from '@/components/ui/FeedbackProvider'
 
@@ -30,6 +31,7 @@ interface AdminAgendaViewProps {
   appointments: Appointment[]
   blockedSlots: BlockedSlot[]
   timezone?: string | null
+  businessName?: string
   isDemo?: boolean
   isSandboxFallback?: boolean
   onRefresh: (range?: { fromIso: string; toIso: string }) => void
@@ -45,6 +47,7 @@ export function AdminAgendaView({
   appointments,
   blockedSlots,
   timezone = 'Europe/Madrid',
+  businessName = 'nuestro negocio',
   isDemo = false,
   isSandboxFallback = false,
   onRefresh,
@@ -424,6 +427,13 @@ export function AdminAgendaView({
                     {/* Acciones rápidas >= 48px */}
                     {appt.estado === 'confirmada' && (
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <WhatsAppReminderButton
+                          appointment={appt}
+                          timezone={tz}
+                          businessName={businessName}
+                          isDemo={isDemo}
+                        />
+
                         <button
                           type="button"
                           disabled={isUpdating}
